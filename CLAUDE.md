@@ -34,7 +34,8 @@ From the Bash tool, run these through `powershell.exe -ExecutionPolicy Bypass -F
 - Check SkyrimNet before calling it: `SKSE.GetPluginVersion` + `GetBuildVersion` in Papyrus, resolved
   pointers in C++. Keep the manifest's `min_skyrimnet_version` in step.
 - Nothing slow on the game thread. C++ action `execute` runs there; queries and I/O go to a worker.
-- In C++, only `SkyrimNetBridge.cpp` includes `PublicAPI.h` (it defines globals).
+- In C++, only `SkyrimNetBridge.cpp` includes `PublicAPI.h`, so every version check lives in one place.
+  (Copies of the header from before SkyrimNet 0.28 define globals and break a second include.)
 - One prefix for everything a mod owns: scripts, editor ids, StorageUtil keys, decorators, event types.
   Action names are LLM-facing plain words.
 - Content goes in the external layer. Folder name = manifest `id`; `author` = the id's author segment;

@@ -195,7 +195,7 @@ for SE, AE and VR. Manifest id `example.cpp-native` for its prompt layer.
 ├── CMakeLists.txt, vcpkg.json
 ├── src/
 │   ├── main.cpp                SKSE entry, logging, messaging listener (kDataLoaded -> Bridge::Init)
-│   ├── SkyrimNetBridge.h/.cpp  The ONLY file that includes sdk/cpp/PublicAPI.h. FindFunctions(),
+│   ├── SkyrimNetBridge.h/.cpp  The one file that includes sdk/cpp/PublicAPI.h. FindFunctions(),
 │   │                           version gate, a Features struct (decorators, events, queries...)
 │   ├── Decorators.cpp          PublicRegisterDecorator: thread-safe reads, "" for invalid actors
 │   ├── Actions.cpp             PublicRegisterCPPSubCategory + two PublicRegisterCPPAction leaves;

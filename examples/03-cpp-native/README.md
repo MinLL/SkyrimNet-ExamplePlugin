@@ -12,7 +12,7 @@ the player a few coins, and can bring up a memory they share with the player.
 
 | File | What it shows |
 |---|---|
-| `src/SkyrimNetBridge.h/.cpp` | The only file that includes `PublicAPI.h`. `Connect()`, a `Features` struct, typed wrappers |
+| `src/SkyrimNetBridge.h/.cpp` | The one file that includes `PublicAPI.h`. `Connect()`, a `Features` struct, typed wrappers |
 | `src/main.cpp` | SKSE entry point; connects and registers at `kDataLoaded` |
 | `src/Decorators.cpp` | Two decorators: plugin state (`native_senses_lines_spoken`) and game data (`native_senses_purse`) |
 | `src/Actions.cpp` | A category with two actions; JSON parameters; game-thread vs worker work |
@@ -42,7 +42,9 @@ with one action fewer. The log says which features are on.
 
 ## Things that are easy to get wrong
 
-- **Include `PublicAPI.h` in one `.cpp` only.** It defines globals; a second include fails to link.
+- **Keep `PublicAPI.h` behind one bridge file.** Version checks then live in one place, and it works
+  with older copies of the header (before SkyrimNet 0.28), which define globals and fail to link when
+  a second `.cpp` includes them.
 - **Action categories:** a category is `PublicRegisterCPPSubCategory` with its own name as
   `customCategory`. An action joins it with type `CPP_NESTED_ACTION` and the same `customCategory`.
   Top-level actions use `CPP`. Other values are treated as `CPP`.

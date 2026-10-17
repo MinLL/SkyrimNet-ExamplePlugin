@@ -6,7 +6,7 @@ edit is lost and hides an API mismatch from you.
 | Path | What it is |
 |---|---|
 | `VERSION` | The SkyrimNet release these files came from |
-| `cpp/PublicAPI.h` | The C++ API. Include it from exactly one `.cpp` (see `examples/03-cpp-native/src/SkyrimNetBridge.cpp`) |
+| `cpp/PublicAPI.h` | The C++ API. Best kept behind one bridge file (see `examples/03-cpp-native/src/SkyrimNetBridge.cpp`) |
 | `cpp/PublicAPIMemoryQuery.h`, `cpp/PublicAPIDiaryQuery.h` | Query structs used by `PublicAPI.h` |
 | `papyrus/SkyrimNetApi.psc` | The Papyrus API. Compile against it; never ship it (SkyrimNet ships the real one) |
 

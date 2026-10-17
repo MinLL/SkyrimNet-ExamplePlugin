@@ -78,7 +78,9 @@ Full reference: [modding/CONTENT_ROOTS.md](modding/CONTENT_ROOTS.md).
 
 ## C++
 
-- **Include `PublicAPI.h` in exactly one `.cpp`.** It defines globals. Wrap it. (03: `SkyrimNetBridge`)
+- **Wrap `PublicAPI.h` in one bridge file** that the rest of your plugin calls, so every version check
+  lives in one place. (03: `SkyrimNetBridge`) Copies of the header from before SkyrimNet 0.28 define
+  globals and fail to link if a second `.cpp` includes them.
 - **Decide features from resolved pointers**, not only from `PublicGetVersion()`, and register
   optional features only when present.
 - **Respect the threads:**

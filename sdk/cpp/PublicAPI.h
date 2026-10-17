@@ -26,7 +26,7 @@
  *       PublicRegisterCPPAction("MyMod_Wave", "Wave at someone",
  *           [](RE::Actor* a) { return a != nullptr; },
  *           [](RE::Actor* a, std::string params) { return true; },
- *           "dialogue", "Social", 50, "{}", "", "", "");
+ *           "", "CPP", 50, "{}", "", "", "");
  *   }
  *
  *   // Query data later, after a save is loaded.
@@ -37,8 +37,12 @@
  *   }
  * @endcode
  *
- * ABI requirement: Both DLLs must use the same MSVC version and CRT linkage
- * (dynamic /MD). All CommonLibSSE-NG SKSE plugins satisfy this.
+ * ABI requirement: std::string and std::function cross the DLL boundary, so build with the same MSVC
+ * toolset as SkyrimNet (Visual Studio 2022, v143). SkyrimNet links the static CRT (/MT); matching it
+ * is the safe choice.
+ *
+ * The function pointers below are inline variables, so this header can be included from any number of
+ * .cpp files. Copies from releases before SkyrimNet 0.28 are not: include those from one .cpp only.
  *
  * Thread safety: All data query functions (v3+) are thread-safe and return
  * empty results gracefully if called before the database is ready. Action
@@ -64,7 +68,7 @@ extern "C" {
  *                      memory edit/delete, actor search, event registration with an audience,
  *                 12 = send custom decision request to the decision model.
  */
-int (*PublicGetVersion)() = nullptr;
+inline int (*PublicGetVersion)() = nullptr;
 
 /**
  * Register a custom action that NPCs can perform via the LLM action system.
@@ -78,19 +82,22 @@ int (*PublicGetVersion)() = nullptr;
  *                              Return true on success.
  * @param triggeringEventTypesCSV  Comma-separated event types that trigger
  *                              eligibility checks (e.g., "combat_hit,dialogue").
- * @param categoryStr           Built-in category: "Combat", "Social", etc.
- *                              Use customCategory for mod-defined categories.
+ * @param categoryStr           Where the action sits: "CPP" for a top-level action, or
+ *                              "CPP_NESTED_ACTION" for one inside the category named by
+ *                              customCategory. Any other value is treated as "CPP".
  * @param priority              Execution priority (higher = checked first). 50
  *                              is a reasonable default.
  * @param parameterSchemaJSON   JSON Schema describing parameters your action
  *                              accepts. The LLM uses this to generate params.
  *                              Pass "{}" if no parameters.
- * @param customCategory        Custom category name (empty to use categoryStr).
+ * @param customCategory        For "CPP_NESTED_ACTION": the category it belongs to (the
+ *                              customCategory a PublicRegisterCPPSubCategory call used).
+ *                              Empty for a top-level action.
  * @param customParentCategory  Parent category for nesting (empty = top-level).
  * @param tagsCSV               Comma-separated tags for filtering.
  * @return true if registration succeeded.
  */
-bool (*PublicRegisterCPPAction)(const std::string name, const std::string description, std::function<bool(RE::Actor *)> eligibleCallback,
+inline bool (*PublicRegisterCPPAction)(const std::string name, const std::string description, std::function<bool(RE::Actor *)> eligibleCallback,
                                 std::function<bool(RE::Actor *, std::string json_params)> executeCallback,
                                 const std::string triggeringEventTypesCSV, std::string categoryStr, int priority,
                                 std::string parameterSchemaJSON, std::string customCategory, std::string customParentCategory,
@@ -109,12 +116,13 @@ bool (*PublicRegisterCPPAction)(const std::string name, const std::string descri
  * @param triggeringEventTypesCSV  Comma-separated triggering event types.
  * @param priority              Display priority within the parent category.
  * @param parameterSchemaJSON   Reserved, pass "{}".
- * @param customCategory        Category name for this subcategory.
+ * @param customCategory        The key actions use to join this category. Usually the
+ *                              same as name.
  * @param customParentCategory  Parent category (empty = top-level).
  * @param tagsCSV               Comma-separated tags.
  * @return true if registration succeeded.
  */
-bool (*PublicRegisterCPPSubCategory)(const std::string name, const std::string description,
+inline bool (*PublicRegisterCPPSubCategory)(const std::string name, const std::string description,
                                      std::function<bool(RE::Actor *)> eligibleCallback, const std::string triggeringEventTypesCSV,
                                      int priority, std::string parameterSchemaJSON, std::string customCategory,
                                      std::string customParentCategory, std::string tagsCSV) = nullptr;
@@ -128,19 +136,19 @@ bool (*PublicRegisterCPPSubCategory)(const std::string name, const std::string d
  * @param formId  Actor FormID (e.g., 0x00000014 for the player).
  * @return UUID, or 0 if the actor is unknown.
  */
-uint64_t (*PublicFormIDToUUID)(uint32_t formId) = nullptr;
+inline uint64_t (*PublicFormIDToUUID)(uint32_t formId) = nullptr;
 
 /**
  * Convert a SkyrimNet UUID back to a Skyrim FormID.
  * @return FormID, or 0 if unknown.
  */
-uint32_t (*PublicUUIDToFormID)(uint64_t uuid) = nullptr;
+inline uint32_t (*PublicUUIDToFormID)(uint64_t uuid) = nullptr;
 
 /**
  * Get an actor's display name from their UUID.
  * @return Actor name, or "" if unknown.
  */
-std::string (*PublicGetActorNameByUUID)(uint64_t uuid) = nullptr;
+inline std::string (*PublicGetActorNameByUUID)(uint64_t uuid) = nullptr;
 
 // =============================================================================
 // Bio Template (v3+)
@@ -151,7 +159,7 @@ std::string (*PublicGetActorNameByUUID)(uint64_t uuid) = nullptr;
  * @param formId  Actor FormID.
  * @return Template name, or "" if none assigned.
  */
-std::string (*PublicGetBioTemplateName)(uint32_t formId) = nullptr;
+inline std::string (*PublicGetBioTemplateName)(uint32_t formId) = nullptr;
 
 // =============================================================================
 // Data Queries (v3+)
@@ -182,7 +190,7 @@ std::string (*PublicGetBioTemplateName)(uint32_t formId) = nullptr;
  * ]
  * @endcode
  */
-std::string (*PublicGetMemoriesForActor)(uint32_t formId, int maxCount, const char* contextQuery) = nullptr;
+inline std::string (*PublicGetMemoriesForActor)(uint32_t formId, int maxCount, const char* contextQuery) = nullptr;
 
 /**
  * Retrieve memories for an actor with explicit filtering and ordering (v10+). Filters apply in SQL
@@ -192,7 +200,7 @@ std::string (*PublicGetMemoriesForActor)(uint32_t formId, int maxCount, const ch
  * @param queryJSON JSON filter object. Empty or "{}" behaves like PublicGetMemoriesForActor(formId, 50, "").
  * @return The same JSON array shape PublicGetMemoriesForActor returns; "[]" on error or malformed JSON.
  */
-std::string (*PublicQueryMemoriesForActor)(uint32_t formId, const char* queryJSON) = nullptr;
+inline std::string (*PublicQueryMemoriesForActor)(uint32_t formId, const char* queryJSON) = nullptr;
 
 /**
  * Retrieve recent world events, optionally filtered.
@@ -228,7 +236,7 @@ std::string (*PublicQueryMemoriesForActor)(uint32_t formId, const char* queryJSO
  * ]
  * @endcode
  */
-std::string (*PublicGetRecentEvents)(uint32_t formId, int maxCount, const char* eventTypeFilter) = nullptr;
+inline std::string (*PublicGetRecentEvents)(uint32_t formId, int maxCount, const char* eventTypeFilter) = nullptr;
 
 /**
  * Retrieve recent dialogue between the player and an NPC.
@@ -255,7 +263,7 @@ std::string (*PublicGetRecentEvents)(uint32_t formId, int maxCount, const char* 
  * ]
  * @endcode
  */
-std::string (*PublicGetRecentDialogue)(uint32_t formId, int maxExchanges) = nullptr;
+inline std::string (*PublicGetRecentDialogue)(uint32_t formId, int maxExchanges) = nullptr;
 
 /**
  * Get info about the most recent NPC who spoke to the player.
@@ -269,13 +277,13 @@ std::string (*PublicGetRecentDialogue)(uint32_t formId, int maxExchanges) = null
  * }
  * @endcode
  */
-std::string (*PublicGetLatestDialogueInfo)() = nullptr;
+inline std::string (*PublicGetLatestDialogueInfo)() = nullptr;
 
 /**
  * Check if the memory/database system is ready for queries. False until a save is loaded or a new game starts.
  * @return true if the database is ready.
  */
-bool (*PublicIsMemorySystemReady)() = nullptr;
+inline bool (*PublicIsMemorySystemReady)() = nullptr;
 
 /**
  * Get per-actor engagement statistics for scoring and prioritization.
@@ -308,7 +316,7 @@ bool (*PublicIsMemorySystemReady)() = nullptr;
  * ]
  * @endcode
  */
-std::string (*PublicGetActorEngagement)(int maxCount, bool excludePlayer, bool playerEventsOnly, double shortWindowSeconds, double mediumWindowSeconds) = nullptr;
+inline std::string (*PublicGetActorEngagement)(int maxCount, bool excludePlayer, bool playerEventsOnly, double shortWindowSeconds, double mediumWindowSeconds) = nullptr;
 
 /**
  * Get actors related to a given actor via shared event history.
@@ -332,7 +340,7 @@ std::string (*PublicGetActorEngagement)(int maxCount, bool excludePlayer, bool p
  * ]
  * @endcode
  */
-std::string (*PublicGetRelatedActors)(uint32_t formId, int maxCount, double shortWindowSeconds, double mediumWindowSeconds) = nullptr;
+inline std::string (*PublicGetRelatedActors)(uint32_t formId, int maxCount, double shortWindowSeconds, double mediumWindowSeconds) = nullptr;
 
 /**
  * Get comprehensive player context: current time, recent interactions,
@@ -356,7 +364,7 @@ std::string (*PublicGetRelatedActors)(uint32_t formId, int maxCount, double shor
  * }
  * @endcode
  */
-std::string (*PublicGetPlayerContext)(float withinGameHours) = nullptr;
+inline std::string (*PublicGetPlayerContext)(float withinGameHours) = nullptr;
 
 /**
  * Get NPC-to-NPC event pair counts within a candidate pool.
@@ -376,7 +384,7 @@ std::string (*PublicGetPlayerContext)(float withinGameHours) = nullptr;
  * ]
  * @endcode
  */
-std::string (*PublicGetEventPairCounts)(const char* formIdListCSV, int minSharedEvents) = nullptr;
+inline std::string (*PublicGetEventPairCounts)(const char* formIdListCSV, int minSharedEvents) = nullptr;
 
 // =============================================================================
 // Diary Queries (v4+)
@@ -396,7 +404,7 @@ std::string (*PublicGetEventPairCounts)(const char* formIdListCSV, int minShared
  *         from DiaryEntry::ToJson() plus an `actor_name` field. v11+ adds
  *         `updated_at` (seconds since epoch of the last edit, null if never edited).
  */
-std::string (*PublicGetDiaryEntries)(uint32_t formId, int maxCount, double startTime, double endTime) = nullptr;
+inline std::string (*PublicGetDiaryEntries)(uint32_t formId, int maxCount, double startTime, double endTime) = nullptr;
 
 // =============================================================================
 // Memory Creation (v5+)
@@ -416,7 +424,7 @@ std::string (*PublicGetDiaryEntries)(uint32_t formId, int maxCount, double start
  * @param relatedActorsJSON  Optional JSON array of related actor FormIDs.
  * @return Memory ID (>0) on success, 0 on error.
  */
-int (*PublicAddMemory)(uint32_t formId, const char* contentText, float importance,
+inline int (*PublicAddMemory)(uint32_t formId, const char* contentText, float importance,
                        const char* memoryType, const char* emotion, const char* location,
                        const char* tagsJSON, const char* relatedActorsJSON) = nullptr;
 
@@ -432,7 +440,7 @@ int (*PublicAddMemory)(uint32_t formId, const char* contentText, float importanc
  * @param pluginName  Plugin name (without "Plugin_" prefix).
  * @return JSON object of the config, or "{}" if not found.
  */
-std::string (*PublicGetPluginConfig)(const char* pluginName) = nullptr;
+inline std::string (*PublicGetPluginConfig)(const char* pluginName) = nullptr;
 
 /**
  * Get a single config value by dot-path from a plugin's settings.
@@ -442,7 +450,7 @@ std::string (*PublicGetPluginConfig)(const char* pluginName) = nullptr;
  * @param defaultValue  Returned if the path doesn't exist.
  * @return The config value as a string, or defaultValue if not found.
  */
-std::string (*PublicGetPluginConfigValue)(const char* pluginName, const char* path, const char* defaultValue) = nullptr;
+inline std::string (*PublicGetPluginConfigValue)(const char* pluginName, const char* path, const char* defaultValue) = nullptr;
 
 // =============================================================================
 // Decorator Registration (v5+)
@@ -475,13 +483,13 @@ std::string (*PublicGetPluginConfigValue)(const char* pluginName, const char* pa
  *   // Use in action YAML eligibility rules:
  *   //   eligibilityRules:
  *   //     - conditions:
- *   //       - decorator: intel_standing
- *   //         arguments: ["currentactor"]
- *   //         operator: ">="
- *   //         expected: "20"
+ *   //       - decoratorName: intel_standing
+ *   //         arguments: ["currentActor"]
+ *   //         comparisonOperator: ">="
+ *   //         expectedValue: 20
  * @endcode
  */
-bool (*PublicRegisterDecorator)(const char* name, const char* description,
+inline bool (*PublicRegisterDecorator)(const char* name, const char* description,
                                 std::function<std::string(RE::Actor*)> callback) = nullptr;
 
 /**
@@ -490,7 +498,7 @@ bool (*PublicRegisterDecorator)(const char* name, const char* description,
  * @param name  Decorator name to check.
  * @return true if registered, false otherwise.
  */
-bool (*PublicHasDecorator)(const char* name) = nullptr;
+inline bool (*PublicHasDecorator)(const char* name) = nullptr;
 
 // =============================================================================
 // Event Callbacks (v5+)
@@ -528,7 +536,7 @@ bool (*PublicHasDecorator)(const char* name) = nullptr;
  *   });
  * @endcode
  */
-uint64_t (*PublicRegisterEventCallback)(const char* eventType,
+inline uint64_t (*PublicRegisterEventCallback)(const char* eventType,
                                         std::function<void(const char*)> callback) = nullptr;
 
 /**
@@ -537,7 +545,7 @@ uint64_t (*PublicRegisterEventCallback)(const char* eventType,
  * @param callbackId  The ID returned by PublicRegisterEventCallback.
  * @return true if the callback was found and removed.
  */
-bool (*PublicUnregisterEventCallback)(uint64_t callbackId) = nullptr;
+inline bool (*PublicUnregisterEventCallback)(uint64_t callbackId) = nullptr;
 
 // =============================================================================
 // Actor Busy State (v6+)
@@ -551,16 +559,16 @@ bool (*PublicUnregisterEventCallback)(uint64_t callbackId) = nullptr;
  * @param reason   Short reason string (e.g., "arrest", "travel", "crafting").
  * @return true on success, false if the FormID couldn't be resolved.
  */
-bool (*PublicSetActorBusy)(uint32_t formId, const char* reason) = nullptr;
+inline bool (*PublicSetActorBusy)(uint32_t formId, const char* reason) = nullptr;
 
 /**
  * Clear an actor's busy state.
  * @return true on success, false if the FormID couldn't be resolved.
  */
-bool (*PublicClearActorBusy)(uint32_t formId) = nullptr;
+inline bool (*PublicClearActorBusy)(uint32_t formId) = nullptr;
 
 /** Check if an actor is currently busy. */
-bool (*PublicIsActorBusy)(uint32_t formId) = nullptr;
+inline bool (*PublicIsActorBusy)(uint32_t formId) = nullptr;
 
 // =============================================================================
 // Current save UUID (v7+)
@@ -570,7 +578,7 @@ bool (*PublicIsActorBusy)(uint32_t formId) = nullptr;
  * Get the unique save ID for the current save.
  * @return the unique save ID, empty string if a save is not loaded.
 */
-std::string (*PublicGetSaveUniqueID)() = nullptr;
+inline std::string (*PublicGetSaveUniqueID)() = nullptr;
 
 // =============================================================================
 // World Knowledge (v7+)
@@ -606,7 +614,7 @@ std::string (*PublicGetSaveUniqueID)() = nullptr;
  *       "", true, 0.9, "Dragon Attack");
  * @endcode
  */
-int (*PublicAddWorldKnowledge)(const char* content, const char* conditionExpr,
+inline int (*PublicAddWorldKnowledge)(const char* content, const char* conditionExpr,
                                bool alwaysInject, float importance,
                                const char* displayName) = nullptr;
 
@@ -617,7 +625,7 @@ int (*PublicAddWorldKnowledge)(const char* content, const char* conditionExpr,
  * @param memoryId  The ID returned by PublicAddWorldKnowledge.
  * @return true on success, false if not found or not a world knowledge entry.
  */
-bool (*PublicRemoveWorldKnowledge)(int memoryId) = nullptr;
+inline bool (*PublicRemoveWorldKnowledge)(int memoryId) = nullptr;
 
 /**
  * Get all world knowledge entries as a JSON array.
@@ -626,7 +634,7 @@ bool (*PublicRemoveWorldKnowledge)(int memoryId) = nullptr;
  * @return JSON array of knowledge entry objects. Each includes id, content,
  *         condition_expr, always_inject, importance, display_name, is_active.
  */
-std::string (*PublicGetWorldKnowledge)(int maxCount) = nullptr;
+inline std::string (*PublicGetWorldKnowledge)(int maxCount) = nullptr;
 
 /**
  * Get world knowledge entries applicable to a specific actor (the C++ side of the get_world_knowledge() decorator).
@@ -637,7 +645,7 @@ std::string (*PublicGetWorldKnowledge)(int maxCount) = nullptr;
  * @param searchQuery  Semantic search query, or "" for always-inject only.
  * @return JSON array: [{"content":"...","always_inject":true,"importance":0.8,"display_name":"..."}, ...]. "[]" if none.
  */
-std::string (*PublicGetWorldKnowledgeForActor)(uint32_t formId, int maxResults,
+inline std::string (*PublicGetWorldKnowledgeForActor)(uint32_t formId, int maxResults,
                                                const char* searchQuery) = nullptr;
 
 // =============================================================================
@@ -666,7 +674,7 @@ std::string (*PublicGetWorldKnowledgeForActor)(uint32_t formId, int maxResults,
  *       });
  * @endcode
  */
-bool (*PublicSendCustomPromptToLLM)(const char* promptName, const char* variant,
+inline bool (*PublicSendCustomPromptToLLM)(const char* promptName, const char* variant,
                                     const char* contextJson,
                                     std::function<void(const char* response, int success)> callback) = nullptr;
 
@@ -685,7 +693,7 @@ bool (*PublicSendCustomPromptToLLM)(const char* promptName, const char* variant,
  *         When the check finishes SkyrimNet fires the ModEvent SkyrimNet_TimelineResolved
  *         (numArg = state, JSON {"state", "stateName"}); poll this only if you may miss it.
  */
-int (*PublicGetTimelineState)() = nullptr;
+inline int (*PublicGetTimelineState)() = nullptr;
 
 /**
  * One actor's diary entries with explicit filtering and ordering, the diary counterpart of
@@ -712,7 +720,7 @@ int (*PublicGetTimelineState)() = nullptr;
  * @return JSON array in the same shape as PublicGetDiaryEntries (id, entry_date, creation_time,
  *         tags, updated_at, actor_name...). "[]" on error or malformed JSON.
  */
-std::string (*PublicQueryDiaryEntries)(uint32_t formId, const char* queryJSON) = nullptr;
+inline std::string (*PublicQueryDiaryEntries)(uint32_t formId, const char* queryJSON) = nullptr;
 
 /**
  * Add a diary entry for any actor, e.g. one the player wrote. It is treated like a generated
@@ -732,7 +740,7 @@ std::string (*PublicQueryDiaryEntries)(uint32_t formId, const char* queryJSON) =
  * @param location   Where it was written. May be null.
  * @return The new entry id, or 0 on error.
  */
-int (*PublicAddDiaryEntry)(uint32_t formId, const char* content, double entryDate, const char* tagsCSV,
+inline int (*PublicAddDiaryEntry)(uint32_t formId, const char* content, double entryDate, const char* tagsCSV,
                            const char* emotion, float importance, const char* location) = nullptr;
 
 /**
@@ -746,14 +754,14 @@ int (*PublicAddDiaryEntry)(uint32_t formId, const char* content, double entryDat
  * @param tagsCSV New comma-separated tags. null = keep the current tags, "" = clear them.
  * @return true on success.
  */
-bool (*PublicUpdateDiaryEntry)(int entryId, const char* content, const char* tagsCSV) = nullptr;
+inline bool (*PublicUpdateDiaryEntry)(int entryId, const char* content, const char* tagsCSV) = nullptr;
 
 /**
  * Delete any diary entry and its memory. Fires SkyrimNet_DiaryDeleted.
  * Refused (false) while PublicGetTimelineState() is 1.
  * @return true on success, false if refused, the entry does not exist, or the delete failed.
  */
-bool (*PublicDeleteDiaryEntry)(int entryId) = nullptr;
+inline bool (*PublicDeleteDiaryEntry)(int entryId) = nullptr;
 
 /**
  * Edit an actor memory (`id` from PublicGetMemoriesForActor / PublicQueryMemoriesForActor).
@@ -777,7 +785,7 @@ bool (*PublicDeleteDiaryEntry)(int entryId) = nullptr;
  *   PublicUpdateMemory(id, R"({"content":"Lydia saved my life at Bleak Falls.","importance":0.9})");
  * @endcode
  */
-bool (*PublicUpdateMemory)(int memoryId, const char* changesJSON) = nullptr;
+inline bool (*PublicUpdateMemory)(int memoryId, const char* changesJSON) = nullptr;
 
 /**
  * Delete an actor memory and its embedding. Fires SkyrimNet_MemoryDeleted. A diary entry's memory
@@ -785,7 +793,7 @@ bool (*PublicUpdateMemory)(int memoryId, const char* changesJSON) = nullptr;
  * @return true on success. false if it does not exist, PublicGetTimelineState() is 1, or it is
  *         world knowledge or plugin-installed.
  */
-bool (*PublicDeleteMemory)(int memoryId) = nullptr;
+inline bool (*PublicDeleteMemory)(int memoryId) = nullptr;
 
 /**
  * Search the actors SkyrimNet has resolved (every actor it has registered in this save, loaded or not)
@@ -802,7 +810,7 @@ bool (*PublicDeleteMemory)(int memoryId) = nullptr;
  *         them apart (alive, location, unique base) is up to the caller. `formId` is the runtime
  *         FormID SkyrimNet last saw for the actor, the same value PublicUUIDToFormID returns.
  */
-std::string (*PublicSearchActors)(const char* nameContains, int maxCount) = nullptr;
+inline std::string (*PublicSearchActors)(const char* nameContains, int maxCount) = nullptr;
 
 /**
  * Register an event, the C++ counterpart of Papyrus SkyrimNetApi.RegisterEvent, optionally perceived by
@@ -838,7 +846,7 @@ std::string (*PublicSearchActors)(const char* nameContains, int maxCount) = null
  *                       katarinaFormId, 0, audience, 1);
  * @endcode
  */
-int (*PublicRegisterEvent)(const char* eventType, const char* content, uint32_t originatorFormId,
+inline int (*PublicRegisterEvent)(const char* eventType, const char* content, uint32_t originatorFormId,
                            uint32_t targetFormId, const uint32_t* audienceFormIds, uint32_t audienceCount) = nullptr;
 
 // =============================================================================
@@ -880,7 +888,7 @@ int (*PublicRegisterEvent)(const char* eventType, const char* content, uint32_t 
  *       });
  * @endcode
  */
-bool (*PublicSendCustomDecisionToLLM)(const char* templateName, const char* contextJson, int maxProbabilities,
+inline bool (*PublicSendCustomDecisionToLLM)(const char* templateName, const char* contextJson, int maxProbabilities,
                                       std::function<void(const char* answer, const char* resultJson, int success)> callback) = nullptr;
 
 // =============================================================================
@@ -894,7 +902,7 @@ bool (*PublicSendCustomDecisionToLLM)(const char* templateName, const char* cont
  * the SkyrimNet_OnPackageAdded / Removed / OnPackagesHeld / Released ModEvents (contract: SkyrimNetApi.psc).
  * There are no C++ package functions; a DLL uses this to know the Papyrus contract is there.
  */
-uint32_t (*PublicGetPackageApiVersion)() = nullptr;
+inline uint32_t (*PublicGetPackageApiVersion)() = nullptr;
 
 // =============================================================================
 // Initialization

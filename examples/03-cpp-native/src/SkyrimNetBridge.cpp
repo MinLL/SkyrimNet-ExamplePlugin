@@ -1,6 +1,6 @@
 #include "SkyrimNetBridge.h"
 
-// Defines the API's function pointers. Include it in this file and no other.
+// The rest of the plugin goes through this file's functions, never the Public* pointers.
 #include "PublicAPI.h"
 
 namespace SkyrimNetBridge

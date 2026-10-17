@@ -4,10 +4,13 @@
 
 // The plugin's only door into SkyrimNet.
 //
-// SkyrimNet's PublicAPI.h defines its function pointers as globals, so it may be included by one
-// .cpp file only: SkyrimNetBridge.cpp. Everything else calls the functions below, which also keeps
-// every version check in one place. Each function is safe to call whatever SkyrimNet is installed:
-// it does nothing (and returns false, 0 or "") when the feature it needs is missing.
+// Only SkyrimNetBridge.cpp includes SkyrimNet's PublicAPI.h. Everything else calls the functions
+// below, so every version check lives in one place. (It also keeps older copies of the header
+// working: before SkyrimNet 0.28 they defined the function pointers as globals, and a second
+// include failed to link.)
+//
+// Each function is safe to call whatever SkyrimNet is installed: it does nothing (and returns
+// false, 0 or "") when the feature it needs is missing.
 namespace SkyrimNetBridge
 {
     // What the installed SkyrimNet supports. Decided once, in Connect().
