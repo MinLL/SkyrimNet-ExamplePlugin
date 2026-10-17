@@ -1,0 +1,22 @@
+{
+  "_comment": "Tools the build downloads into external-tools/. scripts/fetch-tools.ps1 reads this file; cmake/Tools.cmake reads the folder names. Pinned to the versions SkyrimNet-Core builds with.",
+  "papyrus-compiler": {
+    "version": "2026.03.15",
+    "folder": "papyrus-compiler_2026_03_15",
+    "exe": "papyrus-compiler/papyrus.exe",
+    "url": "https://github.com/russo-2025/papyrus-compiler/releases/download/2026.03.15/papyrus-compiler-windows.zip",
+    "sha256": "67b44c77d00a5cda986bec6af5c228a56abe6ec1fadcb4cfea5c858e6941140e"
+  },
+  "spriggit": {
+    "version": "0.41.0",
+    "folder": "SpriggitCLI-0.41.0",
+    "exe": "Spriggit.CLI.exe",
+    "url": "https://github.com/Mutagen-Modding/Spriggit/releases/download/0.41.0/SpriggitCLI.zip",
+    "sha256": "9b1088eed09f3b6b9d30a40b3b0545cea4c84c3f821b512590a60819f6916529"
+  },
+  "skyrimnet-tools": {
+    "_comment": "content-convert.exe and content-validate.exe, attached to this repo's GitHub Release by SkyrimNet's release CI. No url until the repo is public; the fetch script skips it.",
+    "folder": "skyrimnet",
+    "url": ""
+  }
+}

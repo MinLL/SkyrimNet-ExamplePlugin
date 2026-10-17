@@ -1,0 +1,8 @@
+* text=auto
+*.psc text eol=crlf
+*.ps1 text eol=crlf
+*.json text eol=lf
+*.yaml text eol=lf
+*.prompt text eol=lf
+*.esp binary
+*.pex binary

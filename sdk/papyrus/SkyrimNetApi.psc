@@ -1,0 +1,1013 @@
+Scriptname SkyrimNetApi
+
+
+; -----------------------------------------------------------------------------
+; --- Decorator Management ---
+; -----------------------------------------------------------------------------
+
+; Register a decorator to be used when resolving a variable in a prompt
+; - decoratorID: Unique identifier for the decorator, e.g., "my_custom_decorator"
+; - sourceScript: The script where the global decorator function is defined
+; - functionName: The name of the function in the source script that implements the decorator logic
+;                 
+;   Functions with an Actor parameter can be called from the prompt template by passing a UUID 
+;   `{{my_custom_decorator(player.UUID)}}` -> `Function DecoratorFunction(Actor akActor) Global`
+int function RegisterDecorator(String decoratorID, String sourceScript, String functionName) Global Native
+
+; -----------------------------------------------------------------------------
+; --- Action Management ---
+; -----------------------------------------------------------------------------
+
+; Register an action to be performed by an NPC
+;
+; - actionName: Will be visible to the LLM. Take care when naming so the llm will call it in the right circumstances.
+; - parameterSchemaJson: Describes expected parameters, e.g., {"target": "string", "duration": "number"}
+; - categoryStr: Should be PAPYRUS unless the action should only be visible in a custom category which requires PAPYRUS_CUSTOM instead
+; - customCategory: Should be the name of a custom sub-category if normal category is PAPYRUS_CUSTOM
+int function RegisterAction(String actionName, String description, \
+                           String eligibilityScriptName, String eligibilityFunctionName, \
+                           String executionScriptName, String executionFunctionName, \
+                           String triggeringEventTypesCsv, String categoryStr, \
+                           int defaultPriority, String parameterSchemaJson, String customCategory="", String tags="") Global Native
+
+; Register a sub-category which can contain other actions and categories
+; - actionName: What the LLM uses to select a category.  Will be visible to the LLM. Take care when naming so the llm will call it in the right circumstances.
+; - customParentCategory: leave blank unless the sub-category is inside another custom category
+; - customCategory: The name of the new custom sub-category that can contain actions and other sub-categories.
+; Register a custom sub-category for PAPYRUS_CUSTOM actions
+int function RegisterSubCategory (String actionName, String description, \
+                                String eligibilityScriptName, String eligibilityFunctionName, \
+                                String triggeringEventTypesCsv, \
+                                int defaultPriority,String customParentCategory, String customCategory) Global Native
+
+; Register a tag with its associated eligibility function
+int function RegisterTag(String tagName, String eligibilityScriptName, String eligibilityFunctionName) Global Native
+
+; Check if an action is registered in the action library
+; Returns true if the action exists, false otherwise
+bool function IsActionRegistered(String actionName) Global Native
+
+; Unregister an action from the action library
+; Returns 0 on success, 1 on failure (action not found)
+int function UnregisterAction(String actionName) Global Native
+
+; Makes the specified actor run the specified action. Arguments can be supplied as a json string. Runs the action irrespective of cooldowns or eligibility.
+int function ExecuteAction(string actionName, Actor akOriginator, string argsJson) global native
+int function ExecuteActionByUUID(string actionName, string originatorUuid, string argsJson) global native
+
+; Sets the cooldown for the specified action
+int function SetActionCooldown(string actionName, int cooldownTimeSeconds) global native
+
+; Gets the remaining cooldown time for the specified action in seconds. Returns -1 if no cooldown is set.
+int function GetRemainingCooldown(string actionName) global native
+
+; -----------------------------------------------------------------------------
+; --- Event Management ---
+; -----------------------------------------------------------------------------
+
+; Register a short-lived event that appears in scene context and expires after TTL
+; You can use this to have highly real-time events that don't blow up the context. For example, I use these to track the spells that actors have recently cast, like such: spell_cast_actor_id. Whenever an actor casts a spell, it updates this key. Therefore, only the last spell they cast shows up in the context.
+
+; Returns 0 on success, 1 on failure
+; - eventId is a unique key for your event. 
+
+
+int function RegisterShortLivedEvent(String eventId, String eventType, String description, \
+                                    String data, int ttlMs, Actor sourceActor, Actor targetActor) Global Native
+int function RegisterShortLivedEventByUUID(String eventId, String eventType, String description, \
+                                    String data, int ttlMs, String sourceUuid = "", String targetUuid = "") Global Native
+
+; Register a persistent event for historical tracking and analysis
+; Returns 0 on success, 1 on failure
+int function RegisterEvent(String eventType, String content, Actor originatorActor, Actor targetActor) Global Native
+int function RegisterEventByUUID(String eventType, String content, String originatorUuid = "", String targetUuid = "") Global Native
+
+; -----------------------------------------------------------------------------
+; --- Dialogue Management ---
+; -----------------------------------------------------------------------------
+
+; Register dialogue from a speaker (general announcement, no specific listener)
+; Returns 0 on success, 1 on failure
+int function RegisterDialogue(Actor speaker, String dialogue) Global Native
+int function RegisterDialogueByUUID(String speakerUuid, String dialogue) Global Native
+
+; Register dialogue from a speaker to a specific listener
+; Returns 0 on success, 1 on failure
+int function RegisterDialogueToListener(Actor speaker, Actor listener, String dialogue) Global Native
+int function RegisterDialogueToListenerByUUID(String speakerUuid, String listenerUuid, String dialogue) Global Native
+
+; Immediately purge all ongoing NPC dialogue
+; This function stops all dialogue processing:
+; - Clears the speech/TTS generation queue
+; - Clears streaming text buffers
+; - Clears dialogue queues for all actors
+; - Invalidates pending TTS generation tasks
+; If abDeferToCurrentFinished is false (default): also interrupts currently playing audio immediately
+; If abDeferToCurrentFinished is true: allows currently playing audio to finish naturally;
+;   only queues are cleared so nothing follows after the current line ends
+; Note: This is a blocking call on the Papyrus thread. For non-blocking behavior
+; with hotkey-style checks and notifications, use TriggerInterruptDialogue() instead.
+; Returns 1 if audio was interrupted mid-playback, 0 otherwise (always 0 in deferred mode)
+int function PurgeDialogue(bool abDeferToCurrentFinished = false) Global Native
+
+; -----------------------------------------------------------------------------
+; --- Package Management ---
+; -----------------------------------------------------------------------------
+
+; packageName is a SkyrimNet friendly name (TalkToPlayer, TalkToNPC, FollowPlayer) or the EditorID of any
+; Package form in the load order. Names match case-insensitively. Rows are per actor: registering a name the
+; actor already has overwrites that row (last writer wins); a registration with no owner keeps the owner of a
+; row that is not listed, and any other change of owner sends the previous owner SkyrimNet_OnPackageRemoved
+; (reason "replaced") for its row. The one exception: a listed row whose owner set removable false (see
+; ListPackage) belongs to that owner, so a registration or listing of its name by anyone else, or with no
+; owner, is refused and changes nothing.
+; A priority of -1 means the configured default (package.defaultPriority). The highest priority among an
+; actor's SkyrimNet packages and mirrored ActorUtil overrides wins (SkyrimNet saves its copy of the ActorUtil
+; overrides with the game; in a save from an older SkyrimNet it is empty until each mod adds its override
+; again).
+
+; Register a package to be applied to an actor
+; This registers the package internally in SkyrimNet so that its lifecycle is tracked and managed.
+; The row has no owner and ignores the package's conditions. Returns 0 even when the package could not be
+; applied (use RegisterPackageEx for the result); -1 for a None actor.
+int function RegisterPackage(Actor akActor, String packageName, int priority, int flags, bool isPersistent) Global Native
+
+; Register a package with an owner, a display name and, optionally, the package's own conditions.
+; - owner: your mod's name (max 64 bytes, '|' becomes '_'). If another owner already registered the same
+;   package on this actor, its row is overwritten (a warning is logged).
+; - displayName: shown on the SkyrimNet Package Manager page instead of the package name (max 96 bytes).
+; - checkConditions: true = the package only wins while its own conditions are true for the actor.
+; - flags are stored at the configured default.
+; While the actor is held (HoldPackages), the package is stored, not applied, and this returns 2; its form is
+; checked when the hold ends (an unknown package is then dropped with reason "missing").
+; Sends SkyrimNet_OnPackageAdded when a new row is created.
+; Returns 1 applied, 2 stored while the actor is held, 0 failed (unknown package, player or invalid actor,
+; another owner's locked listed row), -1 None actor.
+int function RegisterPackageEx(Actor akActor, String packageName, int priority, bool isPersistent, String owner, String displayName, bool checkConditions) Global Native
+
+; Remove a package from an actor (any owner; not a listed row whose owner set removable false).
+; Returns 0, or -1 for a None actor.
+int function UnregisterPackage(Actor akActor, String packageName) Global Native
+
+; Remove a package only if its row belongs to owner (case-insensitive; "" matches only a row without an owner).
+; Returns 1 removed, 0 not found or owned by someone else, -1 None actor.
+int function UnregisterPackageEx(Actor akActor, String packageName, String owner) Global Native
+
+; List a package your mod runs itself (a quest alias package, a scene) on the SkyrimNet Package Manager page.
+; SkyrimNet never applies or stops it; it only shows the row, saves it with the game and counts it in HasPackage.
+; packageName is an id you pick (it need not be a package form); owner is required (your mod's name).
+; - removable true: the page's Remove (and Remove all, ClearAllPackages, another mod's UnregisterPackage) drops
+;   the row and sends SkyrimNet_OnPackageRemoved; stop the package yourself when you hear it.
+; - removable false: only your own UnregisterPackageEx (same owner), the actor's death or a load drop removes it.
+; - isPersistent false: the row is dropped when a save loads (SkyrimNet_OnPackageRemoved, reason "load"); list
+;   it again after a load. True: it is saved with the game.
+; A hold (HoldPackages) never covers a listed row. Call it again to update the display name or flag. A
+; same-name registration by anyone replaces a removable row (last writer wins; see above); a row with
+; removable false only you can replace.
+; Returns 1 listed, 0 refused (no name or owner, invalid or player actor, another owner's row with removable
+; false), -1 None actor.
+int function ListPackage(Actor akActor, String packageName, String owner, String displayName, bool removable, bool isPersistent) Global Native
+
+; The owner of the actor's row for packageName; "" when the row has no owner or there is no row.
+String function GetPackageOwner(Actor akActor, String packageName) Global Native
+
+; Hold an actor's SkyrimNet packages for owner (your mod's name, required), e.g. for the length of your own
+; scene: every row SkyrimNet tracks for the actor stops applying but stays registered, and every package
+; registered for the actor (SkyrimNet's own dialogue packages included) is stored instead of applied. Holds
+; are owned: the actor stays held while ANY holder remains, and each mod releases only its own hold, so two
+; mods holding the same actor never end each other's. PapyrusUtil ActorUtil overrides and listed rows are not
+; touched. A hold survives saves. Death clears it (you get SkyrimNet_OnPackagesReleased with reason "death"),
+; and the player can end every hold from the Package Manager page (reason "webui"). Holding again is harmless.
+; Sends SkyrimNet_OnPackagesHeld. Returns the number of rows held, or -1 (None actor, player, no owner).
+int function HoldPackages(Actor akActor, String owner) Global Native
+
+; End owner's hold. When no other mod holds the actor, every held package is re-applied. Sends
+; SkyrimNet_OnPackagesReleased when owner was a holder. Returns the number of packages re-applied (0 while
+; another holder remains, or when owner held nothing).
+int function ReleaseHeldPackages(Actor akActor, String owner) Global Native
+
+; True while any mod holds the actor (owner ""), or while owner does.
+bool function IsHoldingPackages(Actor akActor, String owner = "") Global Native
+
+; Schedule a delayed package removal
+int function ScheduleDelayedPackageRemoval(Actor akActor, String packageName, int delaySeconds) Global Native
+
+; Clear all packages applied to an actor (any owner; not a listed row whose owner set removable false). A hold
+; stays in place.
+int function ClearAllPackages(Actor akActor) Global Native
+
+; Clear all packages that SkyrimNet is managing. Holds stay in place.
+int function ClearAllPackagesGlobally() Global Native
+
+; Cancel any pending package removal tasks for an actor
+int function CancelPendingPackageTasks(Actor akActor) Global Native
+
+; Check if an actor currently has a specific skyrimnet package registered (1 / 0); held packages count
+int function HasPackage(Actor akActor, String packageName) Global Native
+
+; Re-apply all SkyrimNet packages to an actor, except held ones. Returns the number re-applied, -1 on error.
+int function ReinforcePackages(Actor akActor) Global Native
+
+; -----------------------------------------------------------------------------
+; --- LLM Interaction ---
+; -----------------------------------------------------------------------------
+
+; Send a custom prompt to the LLM and receive a callback when it responds
+; 
+; Parameters:
+;   promptName          - Name of the prompt template to render (e.g., "my_custom_prompt")
+;   variant             - OpenRouter variant to use (e.g., "meta", "dialogue"), empty string for default
+;   contextJson         - JSON object string with template variables (e.g., "{\"playerName\":\"Dragonborn\"}")
+;                         Pass empty string "" if no custom variables needed
+;   callbackQuest       - The quest containing the callback script (typically GetOwningQuest())
+;   callbackScriptName  - Name of the script attached to the quest
+;   callbackFunctionName - Name of the callback function to invoke
+;
+; Returns:
+;   1 on success (task queued)
+;   -1 if promptName is empty
+;   -2 if callback parameters are empty/null
+;   -3 if LLM configuration failed
+;
+; The callback function signature should be:
+;   Function OnLLMResponse(String response, int success)
+;   - response: The LLM response text (capped at 750 characters), or error message if failed
+;   - success: Status code indicating the result:
+;       1 = Success - LLM responded successfully, response contains the generated text
+;       0 = Error - Something went wrong, response contains the error message
+;           Possible errors include: template render failure, LLM initialization failure,
+;           empty LLM response, network timeout, or other exceptions
+;
+; Example usage:
+;   ; Simple call with default variant and no custom variables:
+;   SkyrimNetApi.SendCustomPromptToLLM("my_prompt", "", "", GetOwningQuest(), "MyQuestScript", "OnMyLLMResponse")
+;   
+;   ; With variant and custom context variables:
+;   String context = "{\"npcName\":\"Lydia\",\"location\":\"Whiterun\"}"
+;   SkyrimNetApi.SendCustomPromptToLLM("my_prompt", "dialogue", context, GetOwningQuest(), "MyQuestScript", "OnMyLLMResponse")
+int function SendCustomPromptToLLM(String promptName, String variant, String contextJson, \
+                                  Quest callbackQuest, String callbackScriptName, String callbackFunctionName) Global Native
+
+; Ask the decision model a typed question and receive a callback with the answer
+;
+; Use this instead of SendCustomPromptToLLM when the answer is a pick from fixed options, a yes/no, or
+; a score: you get the option key and its probability, with no reply text to parse. The template is a
+; decision template ([ state ] / [ question <id> choice|score|noul ] / [ criteria ] blocks, see
+; docs/modding/WORKFLOW_PROMPTS.md) that your mod ships under prompts/decisions/.
+;
+; Parameters:
+;   templateName        - Path under prompts/decisions/ without .prompt (e.g., "my_mod/is_hostile")
+;   contextJson         - JSON object string with template variables, or "" for none
+;   callbackQuest       - The quest containing the callback script (typically GetOwningQuest())
+;   callbackScriptName  - Name of the script attached to the quest
+;   callbackFunctionName - Name of the callback function to invoke
+;
+; Returns:
+;   1 on success (task queued)
+;   -1 if templateName is empty
+;   -2 if callback parameters are empty/null
+;   -3 if LLM configuration failed
+;
+; The callback function signature should be:
+;   Function OnDecision(String answer, String resultJson, int success)
+;   - answer: the answer to the FIRST question in your template, ready to compare:
+;       the chosen option key (choice), "true" or "false" (noul), or the score (score). "" on failure.
+;     For a one-question template this is all you need.
+;   - success 1: resultJson holds, per question id in your template:
+;       "<id>"            - the chosen option key (choice), the score (score), or the probability of yes (noul)
+;       "<id>.confidence" - the model's confidence, when it sent one
+;       "<id>.p.<option>" - the probability of each of the three likeliest options, when it sent them
+;     plus "model" (the model build that answered). Don't name a question "model", "error" or "message".
+;   - success 0: resultJson is {"error": code, "message": text}. Codes:
+;       no_decisions_route - the user has no decision provider set up; nothing was sent. Fall back to
+;                            SendCustomPromptToLLM if you need an answer anyway.
+;       ai_disabled, template_failed, interface_failed, request_failed, cancelled, exception
+;
+; Example usage, with a template prompts/decisions/my_mod/is_hostile.prompt that declares
+; [ question hostile choice ] with criteria keys yes / no:
+;   SkyrimNetApi.SendCustomDecisionToLLM("my_mod/is_hostile", "{\"npcName\":\"Lydia\"}", GetOwningQuest(), "MyQuestScript", "OnHostileDecision")
+;
+;   Function OnHostileDecision(String answer, String resultJson, int success)
+;       If answer == "yes"
+;           float p = SkyrimNetApi.GetJsonFloat(resultJson, "hostile.p.yes", 0.0) ; optional: how sure
+;       EndIf
+;   EndFunction
+int function SendCustomDecisionToLLM(String templateName, String contextJson, \
+                                     Quest callbackQuest, String callbackScriptName, String callbackFunctionName) Global Native
+
+; Register a direct narration event that forces the LLM to respond to a factual event
+; This function creates an event that NPCs will respond to as established fact, such as:
+; - "A tree fell over in the forest"
+; - "The guard glares angrily at the traveler" 
+; - "Lightning strikes the tower"
+; - "A merchant drops their coin purse"
+; 
+; If originatorActor is specified, that actor will be the one to speak/respond to the event
+; If originatorActor is not specified, the system will select an appropriate speaker
+; 
+; If targetActor is specified, the speaker will address that specific target
+; If targetActor is not specified, the speaker will address everyone nearby (general announcement)
+; 
+; Special behavior: If content is empty (""), the event will be registered as a short-lived (ephemeral) event
+; that appears in scene context but does not persist to the database. This is useful for triggering
+; immediate responses without cluttering event history.
+; 
+; Examples:
+; DirectNarration("A wolf howls in the distance") ; System selects speaker, addresses all
+; DirectNarration("The shopkeeper drops a bottle", shopkeeperRef) ; Shopkeeper speaks to all
+; DirectNarration("The guard thinks that the player looks tired", guardRef, Game.GetPlayer()) ; Guard speaks to player
+; DirectNarration("", someActor) ; Trigger immediate response without persistent event
+; 
+; Returns 0 on success, 1 on failure
+int function DirectNarration(String content, Actor originatorActor = None, Actor targetActor = None) Global Native
+int function DirectNarrationByUUID(String content, String originatorUuid, String targetUuid = "") Global Native
+
+; Register a persistent event that informs actors without triggering dialogue reactions
+; This function creates an event that NPCs will be aware of for context, but will NOT
+; respond to with dialogue. Use this for:
+; - Background events that add context but shouldn't interrupt scenes
+; - State changes that actors should know about but not react to immediately
+; - Information that should be stored in actor memory without triggering conversation
+; 
+; Unlike DirectNarration, this event type has NPC reactions disabled by default.
+; The event will still be persisted to the database and appear in the event history
+;
+; Content must not be empty - empty content will be rejected and return 1 (failure).
+;
+; If originatorActor is specified, that actor will be associated with the event
+; If targetActor is specified, that actor will also be associated with the event
+;
+; Examples:
+; RegisterPersistentEvent("The sun sets over the mountains") ; General atmospheric event
+; RegisterPersistentEvent("A caravan arrives at the gates", caravanLeaderRef) ; Associated with an actor
+; RegisterPersistentEvent("The player appears tired from travel", None, Game.GetPlayer()) ; Targets the player
+; 
+; Returns 0 on success, 1 on failure (including empty content)
+int function RegisterPersistentEvent(String content, Actor originatorActor = None, Actor targetActor = None) Global Native
+int function RegisterPersistentEventByUUID(String content, String originatorUuid = "", String targetUuid = "") Global Native
+
+; Transform freeform text into player dialogue using the LLM dialogue pipeline
+; This is the API equivalent of the "Transform Dialogue" hotkey feature.
+; The text is processed through the player dialogue prompt template, transformed
+; by the LLM into character-appropriate speech, and then spoken by the player.
+; Nearby NPCs will react to the transformed dialogue.
+;
+; This function is asynchronous - it returns immediately and the dialogue
+; processing happens in the background.
+;
+; Examples:
+; TransformDialogue("I need to buy some potions") ; Player says this in-character
+; TransformDialogue("Tell me about the recent dragon attack")
+;
+; Returns 0 on success, 1 on failure (including empty text)
+int function TransformDialogue(String dialogueText) Global Native
+
+; Generate an unvoiced NPC thought and persist it to the NPC's event history.
+; The thought is generated asynchronously via the LLM and stored as an EVENT_NPC_THOUGHTS
+; event whose audience is the thinking NPC only — private by default, never spoken aloud,
+; and never heard by other NPCs or the player. It will surface in that NPC's prompts
+; (dialogue, actions, etc.) on subsequent LLM calls, coloring their behavior.
+;
+; Respects per-NPC and global cooldowns from NpcThoughts.yaml. Skips silently if the NPC
+; is dead/unconscious/sleeping or if the caller passes the player (use TriggerPlayerThought
+; for the player).
+;
+; Examples:
+; GenerateNPCThought(guardRef, "You just saw the player pick a lock")
+; GenerateNPCThought(followerRef, "The Jarl insulted your honor — how do you feel?")
+;
+; Returns 0 on success, 1 on failure (null actor or unresolvable entity)
+int function GenerateNPCThought(Actor npcActor, String promptHint) Global Native
+
+; -----------------------------------------------------------------------------
+; --- Utility Functions ---
+; -----------------------------------------------------------------------------
+
+; Utility functions to extract values from a JSON string
+String function GetJsonString(String jsonString, String key, String defaultValue) Global Native
+int function GetJsonInt(String jsonString, String key, int defaultValue) Global Native
+bool function GetJsonBool(String jsonString, String key, bool defaultValue) Global Native
+float function GetJsonFloat(String jsonString, String key, float defaultValue) Global Native
+Actor function GetJsonActor(String jsonString, String key, Actor defaultValue) Global Native
+
+; Find an actor by name among nearby actors (within 4000 units of the player)
+; - actorName: The display name of the actor to find (case-insensitive)
+; Returns: The actor if found, None otherwise
+; Note: "everyone" or empty string returns None (no specific target)
+; This searches both the player and all nearby NPCs
+Actor function FindActorByName(String actorName) Global Native
+
+; SkyrimNet entity UUID for a loaded actor (uppercase hex). Empty string if actor is invalid. Use with Register*ByUUID / ExecuteActionByUUID.
+String function GetEntityUUID(Actor akActor) Global Native
+; Resolve entity metadata from UUID.
+String function GetEntityDisplayNameByUUID(String entityUuid) Global Native
+Bool function IsVirtualEntity(String entityUuid) Global Native
+Actor function GetActorByUUID(String entityUuid) Global Native
+
+; Joins a list of strings into a comma/and-separated list with optional noun phrase
+; - strings: The array of strings to join (e.g., ["apple", "orange", "banana"])
+; - noun: Optional array with [singular, plural] forms (e.g., ["creature", "creatures"])
+;         If provided, appends " is <singular>" for 1 item or " are <plural>" for multiple
+; Returns: The joined string (e.g., "apple, orange and banana" or "apple is creature")
+String function JoinStrings(String[] strings, String[] noun) Global Native
+
+; Utility functions to access configuration values
+String function GetConfigString(String configName, String path, String defaultValue) Global Native
+int function GetConfigInt(String configName, String path, int defaultValue) Global Native
+bool function GetConfigBool(String configName, String path, bool defaultValue) Global Native
+float function GetConfigFloat(String configName, String path, float defaultValue) Global Native
+
+; Utility functions to set configuration values
+; - name: The name of the configuration section to modify. Options:
+;       game, OpenRouter, XTTS, Zonos, Piper, STT, ActorFilter, Phonetic, Hotkey, furniture, PlayerDialogue, VirtualEntities, Entity, Memory, ItemCustomization, Actions, DynamicBio, Events, VastAI, WebServer, VoiceSamples, SpellCustomization
+; - jsonPath: The partial json, of the values to apply to the config
+bool function PatchConfig(String name, String jsonPatch) Global Native
+
+; Utility functions to get build information
+; Returns the SkyrimNet version string (e.g., "0.0.1.0")
+String function GetBuildVersion() Global Native
+; Returns the build configuration type (e.g., "Debug", "Release", etc.)
+String function GetBuildType() Global Native
+
+; Get the unique identifier for the current game playthrough
+; This ID is generated per playthrough and persists across save files within the same playthrough
+; Returns the unique playthrough identifier string (ex: "1775335979900-500596")
+string function GetSaveUniqueID() Global Native
+
+; Check if currently recording voice input
+; Returns true if voice recording is active, false otherwise
+bool function IsRecordingInput() Global Native
+
+; Check if the game is running in VR mode
+; Returns true if running in VR, false otherwise
+bool function IsRunningVR() Global Native
+
+; Get the current number of tasks in the speech generation queue
+; Returns the number of speech tasks currently queued for processing
+int function GetSpeechQueueSize() Global Native
+
+; Get the time in milliseconds since the last audio finished playing
+; Returns the number of milliseconds since the last audio ended, or 0 if no audio has played yet
+int function GetTimeSinceLastAudioEnded() Global Native
+
+; Render a prompt template with a custom variable
+; - templateName: The name of the template file to render (e.g., "my_custom_template")
+; - variableName: The name of the variable to set (can be empty to render without custom variables)
+; - variableValue: The value to assign to the variable (ignored if variableName is empty)
+; Returns the rendered template as a string, or an error message if rendering fails
+String function RenderTemplate(String templateName, String variableName, String variableValue) Global Native
+
+; Parse a string with variable substitution using the PromptEngine
+; - inputStr: The string to parse, containing variable placeholders (e.g., "Hello {{mydata.name}}, welcome to {{mydata.location}}!")
+; - variableName: The name of the variable to set (can be empty to parse without custom variables) (e.g "mydata" or "MyData" - will be converted to lowercase)
+; - variableValue: The value to assign to the variable (ignored if variableName is empty) (e.g "{\"name\":"Bill\", "location\":\"our home\"}")
+; Returns the parsed string with variables substituted, or an error message if parsing fails (e.g "Hello Bill, welcome to our home")
+; Note: The variable name will be automatically converted to lowercase for consistency
+String function ParseString(String inputStr, String variableName, String variableValue) Global Native
+
+; Update the dynamic biography for an actor using the DynamicBioManager
+; - actor: The actor whose dynamic bio should be updated
+; Returns a summary of changes made to the actor's bio, or an empty string if the update failed
+String function UpdateActorDynamicBio(Actor actor) Global Native
+
+; Generate a diary entry for an actor using the DiaryManager
+; - actor: The actor who should write a diary entry
+; Returns a status message indicating whether the diary generation was submitted successfully
+; The generation happens asynchronously in the background
+String function GenerateDiaryEntry(Actor actor) Global Native
+String function GenerateDiaryEntryByUUID(String entityUuid) Global Native
+
+; -----------------------------------------------------------------------------
+; --- Event Schema Registry Functions ---
+; -----------------------------------------------------------------------------
+
+; Register a custom event schema for structured event data
+; - eventType: Unique identifier for the event type (e.g., "custom_spell_learn", "merchant_interaction")
+; - displayName: Human-readable name for the event type
+; - description: Description of what this event represents
+; - fieldsJson: JSON array defining the schema fields. Each field object should contain:
+;   - "name": Field name (string)
+;   - "type": Field type (0=String, 1=Integer, 2=Boolean, 3=Double, 4=Object, 5=Array)
+;   - "required": Whether the field is required (boolean)
+;   - "description": Field description (string)
+;   - "defaultValue": Optional default value (type must match field type)
+;   Example: [{"name":"actor","type":0,"required":true,"description":"Actor name"},{"name":"spell_level","type":1,"required":false,"description":"Spell level","defaultValue":1}]
+; - formatTemplatesJson: JSON object defining format templates for different modes:
+;   - "recent_events": Template for recent events display (usually includes time_desc) - Used for scene context, most commonly used formatting mode
+;   - "raw": Template for raw data access - Used for event history
+;   - "compact": Template for compact display - Used for memories
+;   - "verbose": Template for detailed display - Used for diagnostics
+;   Example: {"recent_events":"**{{actor}}** learned {{spell_name}} ({{time_desc}})","raw":"{{actor}} learned {{spell_name}}","compact":"{{actor}} learned {{spell_name}}","verbose":"{{actor}} learned the {{spell_level}} level spell {{spell_name}}"}
+; - isEphemeral: Whether events of this type should be automatically cleaned up (true) or persist (false)
+; - defaultTTLMs: Default time-to-live in milliseconds for ephemeral events (ignored if isEphemeral is false)
+; - shortLivedEnabled: Whether short-lived scene context events should be created for this type (default true)
+;   Set to false for high-volume events that shouldn't clutter scene context
+; - interrupt: Whether this event type can interrupt ongoing speech/actions (default false)
+;   Set to true for player-initiated events that should take priority
+; Returns 0 on success, 1 on failure
+int function RegisterEventSchema(String eventType, String displayName, String description, \
+                                String fieldsJson, String formatTemplatesJson, bool isEphemeral, int defaultTTLMs, \
+                                bool shortLivedEnabled = true, bool interrupt = false) Global Native
+
+; Validate event data against a registered schema
+; - eventType: The event type to validate against
+; - dataJson: JSON string containing the event data to validate
+; Returns true if the data is valid for the schema, false otherwise
+bool function ValidateEventData(String eventType, String dataJson) Global Native
+
+; Format an event using its registered schema
+; - eventJson: Complete event JSON string (must include "type" field and event data)
+; - mode: Format mode to use ("recent_events", "raw", "compact", "verbose")
+; Returns formatted string according to the schema's template for the specified mode
+String function FormatEvent(String eventJson, String mode) Global Native
+
+; Get schema information for a specific event type
+; - eventType: The event type to get information for
+; Returns JSON string containing schema details (fields, templates, etc.) or "{}" if not found
+String function GetSchemaInfo(String eventType) Global Native
+
+; Get all registered event types
+; Returns JSON array of strings containing all registered event type names
+String function GetAllEventTypes() Global Native
+
+; Check if a specific event type has a registered schema
+; - eventType: The event type to check
+; Returns true if the event type is registered, false otherwise
+bool function IsEventTypeRegistered(String eventType) Global Native
+
+; Get information about all registered schemas
+; Returns JSON object where keys are event types and values are schema information objects
+String function GetAllSchemasInfo() Global Native
+
+; -----------------------------------------------------------------------------
+; --- Virtual NPC Functions ---
+; -----------------------------------------------------------------------------
+
+; Register a new virtual NPC
+; - name: Unique identifier for the virtual NPC
+; - displayName: The display name shown in-game
+; - voiceId: Voice identifier for TTS
+; - conversationMode: Conversation mode setting. Must be "public" or "private"
+; - language: Language setting for the virtual NPC
+; Returns 0 on success or if the virtual NPC already exists, 1 on failure
+int function RegisterVirtualNPC(String name, String displayName, String voiceId, String conversationMode, String language) Global Native
+
+; Update an existing virtual NPC's properties
+; Name is required, other parameters will be updated if not empty
+; - name: Unique identifier of the virtual NPC to update
+; - displayName: The new display name
+; - voiceId: New voice identifier for TTS
+; - conversationMode: New conversation mode setting. Must be "public", "private", or empty
+; - language: New language setting
+; Returns 0 on success, 1 on failure
+int function UpdateVirtualNPC(String name, String displayName, String voiceId, String conversationMode, String language) Global Native
+
+; Enable a virtual NPC
+; - name: Unique identifier of the virtual NPC to enable
+; Returns 0 on success, 1 on failure
+int function EnableVirtualNPC(String name) Global Native
+
+; Disable a virtual NPC
+; - name: Unique identifier of the virtual NPC to disable
+; Returns 0 on success, 1 on failure
+int function DisableVirtualNPC(String name) Global Native
+
+; Get the SkyrimNet entity UUID of a registered virtual NPC (uppercase hex, no "0x" prefix)
+; Virtual NPCs have no Actor, so GetEntityUUID cannot resolve them - use this instead.
+; - name: The registration name passed to RegisterVirtualNPC, or the display name. Case-insensitive.
+; Returns: The hex UUID, or an empty string if no enabled virtual NPC matches that name
+; Only enabled virtual NPCs resolve - call EnableVirtualNPC first.
+; Pair with DirectNarrationByUUID / RegisterDialogueByUUID / ExecuteActionByUUID / etc.
+; The UUID is derived from the registration name, so it is stable across sessions and safe to cache.
+String function GetVirtualNPCUUID(String name) Global Native
+
+; List every currently registered (enabled) virtual NPC
+; Returns: A JSON array string of {"name","displayName","uuid","voiceId","conversationMode"}
+;          objects, or "[]" if there are none
+; The built-in GetJson* helpers only read top-level object keys, so parsing this needs an
+; external JSON library (e.g. JContainers). For the common "I know the name" case use
+; GetVirtualNPCUUID instead - this is for discovery and diagnostics.
+String function GetVirtualNPCList() Global Native
+
+; -----------------------------------------------------------------------------
+; --- Web Interface ---
+; -----------------------------------------------------------------------------
+
+; Open the default web browser to the SkyrimNet web interface
+; Returns 0 on success, 1 on failure
+int function OpenSkyrimNetUI() Global Native
+
+; -----------------------------------------------------------------------------
+; --- Hotkey Trigger Functions ---
+; -----------------------------------------------------------------------------
+
+; These functions trigger hotkey actions programmatically from Papyrus.
+; They function identically as if the player had pressed the corresponding physical key.
+; All functions return 0 on success, 1 on failure.
+
+; --- Voice Recording Functions ---
+
+; Simulates pressing the voice recording hotkey
+; - Plays input start sound effect or shows notification
+; - Prepares search query cache for player input
+; - Starts voice recording with 200-second timeout
+; - Resets GameMaster action cooldown
+; Functions identically to pressing the configured voice recording key
+int function TriggerRecordSpeechPressed() Global Native
+
+; Simulates releasing the voice recording hotkey
+; - Plays input end sound effect or shows notification
+; - Stops voice recording and processes the recorded audio
+; - Duration parameter simulates how long the key was held (in seconds)
+; Functions identically to releasing the configured voice recording key
+int function TriggerRecordSpeechReleased(float duration) Global Native
+
+; Simulates pressing the open mic toggle hotkey
+; - Shows notification
+; - Toggles open mic mode
+; Functions identically to pressing the configured open mic toggle key
+int function TriggerToggleOpenMic() Global Native
+
+; --- Text Input Functions ---
+
+; Simulates pressing the text input hotkey
+; - Prepares search query cache for player input
+; - Opens text input dialog for the player to type their message
+; - Resets GameMaster action cooldown
+; Functions identically to pressing the configured text input key
+int function TriggerTextInput() Global Native
+
+; --- Master Switch ---
+
+; Simulates pressing the SkyrimNet master toggle hotkey
+; - Turns all of SkyrimNet's AI on or off
+; - Shows a notification (SkyrimNet Enabled/Disabled)
+; - Starts or stops the GameMaster agent to match
+; Functions identically to pressing the configured master toggle key
+int function TriggerToggleGlobalAI() Global Native
+
+; --- GameMaster Control Functions ---
+
+; Simulates pressing the GameMaster toggle hotkey
+; - Toggles the GameMaster agent on/off
+; - Updates configuration and shows notification to player
+; - Logs the state change
+; Functions identically to pressing the configured GameMaster toggle key
+int function TriggerToggleGameMaster() Global Native
+
+; Simulates pressing the continuous mode toggle hotkey
+; - Toggles continuous scene mode on/off (requires GameMaster to be enabled)
+; - Shows notification with current state and cooldown time
+; - Only works if GameMaster agent is already enabled
+; Functions identically to pressing the configured continuous mode toggle key
+int function TriggerToggleContinuousMode() Global Native
+
+; Simulates pressing the world event reactions toggle hotkey
+; - Toggles whether NPCs react to world events (dialogue (Including AI dialogue), combat, death, quest stages, etc.)
+; - This effectively disables NPCs from reacting to other NPCs dialogue. No interjections, no interruptions.
+; - Shows notification with current state (NPC Reactions: ON/OFF)
+; - When disabled, NPCs will not autonomously react to world events
+; Functions identically to pressing the configured world event reactions toggle key
+int function TriggerToggleWorldEventReactions() Global Native
+
+; Toggles the runtime master switch for NPC action execution
+; - Disables BOTH embedded-in-dialogue actions and the separate-call action evaluation flow
+; - Shows notification with current state (Actions: ON/OFF)
+; - Runtime only: not persisted to config, resets to enabled on game restart
+int function TriggerToggleActions() Global Native
+
+; --- Interaction Control Functions ---
+
+; Simulates pressing the whisper mode toggle hotkey
+; - Toggles interaction.maxDistance between interaction.whisperMaxDistance and interaction.normalMaxDistance
+; - Shows notification with current state (Whisper mode: ON/OFF)
+; Functions identically to pressing the configured whisper toggle key
+int function TriggerToggleWhisperMode() Global Native
+
+; Toggles the in-game PrismaUI dashboard overlay (open if closed, close if open)
+; - Honors the same guards as the C++ dashboard hotkey: no-op while the chat
+;   overlay is open; on open, applies crosshair-target navigation per the
+;   Dashboard config (enabled / shift / disabled)
+; - Works regardless of whether C++ hotkeys are enabled, so VR users running
+;   in-game (Papyrus) hotkeys can still reach the dashboard via the wheel menu
+;   or a bound key
+; Returns 0 on success, 1 on failure
+int function TriggerToggleDashboard() Global Native
+
+; Tell the dashboard's input sink which key/button currently toggles the
+; dashboard (the in-game hotkey's keycode), so it can close the dashboard while
+; it's open. While the dashboard owns input focus the normal Papyrus OnKeyDown
+; is suppressed, so the key alone can't close it; the input sink handles that.
+; Pass -1 to disable (e.g. when in-game hotkeys are turned off).
+; - keyCode: DXScanCode (keyboard) or gamepad keycode, same as RegisterForKey
+; Returns 0 on success, 1 on failure
+int function SetDashboardToggleKey(int keyCode) Global Native
+
+; --- Thought System Functions ---
+
+; Simulates pressing the text thought hotkey
+; - Shows "Enter your thought..." notification
+; - Prepares search query cache for player input
+; - Opens text input dialog for thought input
+; - Resets GameMaster action cooldown
+; Functions identically to pressing the configured text thought key
+int function TriggerTextThought() Global Native
+
+; Simulates pressing the voice thought recording hotkey
+; - Plays input start sound effect or shows notification
+; - Prepares search query cache for player input
+; - Starts voice recording with 90-second timeout for thought input
+; - Resets GameMaster action cooldown
+; Functions identically to pressing the configured voice thought key
+int function TriggerVoiceThoughtPressed() Global Native
+
+; Simulates releasing the voice thought recording hotkey
+; - Stops voice recording and processes the recorded audio for thoughts
+; - If duration < 0.3 seconds, prompts character to think with empty string
+; - If duration >= 0.3 seconds, processes the recorded audio normally
+; - Duration parameter simulates how long the key was held (in seconds)
+; Functions identically to releasing the configured voice thought key
+int function TriggerVoiceThoughtReleased(float duration) Global Native
+
+; --- Dialogue Transformation Functions ---
+
+; Simulates pressing the text dialogue transformation hotkey
+; - Shows "Enter text to transform into dialogue..." notification
+; - Prepares search query cache for player input
+; - Opens text input dialog for dialogue transformation
+; - Resets GameMaster action cooldown
+; Functions identically to pressing the configured text dialogue transform key
+int function TriggerTextDialogueTransform() Global Native
+
+; Simulates pressing the voice dialogue transformation hotkey
+; - Plays input start sound effect or shows notification
+; - Prepares search query cache for player input
+; - Starts voice recording with 90-second timeout for dialogue transformation
+; - Resets GameMaster action cooldown
+; Functions identically to pressing the configured voice dialogue transform key
+int function TriggerVoiceDialogueTransformPressed() Global Native
+
+; Simulates releasing the voice dialogue transformation hotkey
+; - Stops voice recording and processes the recorded audio for dialogue transformation
+; - If duration < 0.3 seconds, prompts character to speak with empty string
+; - If duration >= 0.3 seconds, processes the recorded audio normally
+; - Duration parameter simulates how long the key was held (in seconds)
+; Functions identically to releasing the configured voice dialogue transform key
+int function TriggerVoiceDialogueTransformReleased(float duration) Global Native
+
+; --- Direct Input Functions ---
+
+; Simulates pressing the direct input hotkey
+; - Shows "Enter custom event text..." notification
+; - Prepares search query cache for player input
+; - Opens text input dialog for direct event input
+; - Resets GameMaster action cooldown
+; Functions identically to pressing the configured direct input key
+int function TriggerDirectInput() Global Native
+
+; Simulates pressing the voice direct input hotkey
+; - Plays input start sound effect or shows notification
+; - Prepares search query cache for player input
+; - Starts voice direct input recording with 200-second timeout
+; - Resets GameMaster action cooldown
+; Functions identically to pressing the configured voice direct input key
+int function TriggerVoiceDirectInputPressed() Global Native
+
+; Simulates releasing the voice direct input hotkey
+; - Plays input end sound effect or shows notification
+; - Stops voice recording and processes the recorded audio for direct input
+; - Duration parameter simulates how long the key was held (in seconds)
+; Functions identically to releasing the configured voice direct input key
+int function TriggerVoiceDirectInputReleased(float duration) Global Native
+
+; --- Narration Control Functions ---
+
+; Simulates pressing the continue narration hotkey
+; - Shows "Continuing narration..." notification
+; - Registers an ephemeral EVENT_CONTINUE_NARRATION event
+; - Triggers callbacks for narration continuation without persisting the event
+; Functions identically to pressing the configured continue narration key
+int function TriggerContinueNarration() Global Native
+
+; --- Player Dialogue and Thought Functions ---
+
+; Triggers an autonomous thought from the player based on current circumstances and contex
+; Returns 0 on success, 1 on failure
+int function TriggerPlayerThought() Global Native
+
+; Triggers an autonomous dialogue from the player based on current circumstances and context
+; Returns 0 on success, 1 on failure
+int function TriggerPlayerDialogue() Global Native
+
+; Sends a line of player dialogue directly to TTS, without prompting the LLM or saving to context
+int function TriggerPlayerTTS(String dialogue) Global Native
+
+; Polling API for player TTS completion (for DBVO integration)
+bool function IsPlayerTTSFinished() Global Native
+
+; Pre-generate TTS for silent NPC responses
+; Returns 0 on success, 1 on error
+int function PrepareNPCDialogue(String playerDialogueText) Global Native
+
+; Check if NPC dialogue (vanilla or TTS-generated) is ready to play
+bool function IsNPCDialogueReady() Global Native
+
+; -----------------------------------------------------------------------------
+; --- C++ Hotkey Manager Control ---
+; -----------------------------------------------------------------------------
+
+; Enable or disable the C++ hotkey manager
+; - enabled: true to enable C++ hotkeys, false to disable them
+; Returns 0 on success, 1 on failure
+int function SetCppHotkeysEnabled(bool enabled) Global Native
+
+; Check if C++ hotkey manager is currently enabled
+; Returns true if C++ hotkeys are enabled, false otherwise
+bool function IsCppHotkeysEnabled() Global Native
+
+; -----------------------------------------------------------------------------
+; --- Telepathy ---
+; -----------------------------------------------------------------------------
+; Telepathy is a runtime feature that lets the player perceive NPC thoughts:
+; the SkyrimNet_TelepathyPerk gates display in the in-game chat overlay and
+; (when this eavesdrop toggle is on) TTS voicing of nearby NPC thoughts. The
+; SkyrimNet_TelepathyCanonicalPerk additionally adds the player to the audience
+; of nearby NPC-thought events so the LLM treats the character as in-fiction
+; telepathic. The eavesdrop toggle is a runtime-only atomic — it does NOT
+; persist across save/reload (resets to OFF every game load).
+
+; Flip the eavesdrop toggle. Returns the new state (true = ON, false = OFF).
+bool function ToggleTelepathyEavesdropping() Global Native
+
+; Returns the current eavesdrop state.
+bool function IsTelepathyEavesdroppingEnabled() Global Native
+
+; Set the eavesdrop state explicitly.
+function SetTelepathyEavesdroppingEnabled(bool enabled) Global Native
+
+; -----------------------------------------------------------------------------
+; --- GameMaster State Queries ---
+; -----------------------------------------------------------------------------
+
+; Check if continuous scene mode is enabled
+; When enabled, NPCs will keep talking autonomously after player interaction ends
+; Returns true if continuous mode is enabled, false otherwise
+bool function IsContinuousModeEnabled() Global Native
+
+; -----------------------------------------------------------------------------
+; --- Crosshair Capture Hotkey (OmniSight) ---
+; -----------------------------------------------------------------------------
+
+; Simulates pressing the crosshair capture hotkey (OmniSight)
+; No action on press - waits for release to determine intent
+; Returns 0 on success, 1 on failure
+int function TriggerCaptureCrosshairPressed() Global Native
+
+; Simulates releasing the crosshair capture hotkey (OmniSight)
+; - holdDuration: How long the key was held in seconds
+;   - Quick press (< 1.0s): Captures crosshair target (actor or furniture)
+;   - Long press (>= 1.0s): Captures player
+; Returns 0 on success, 1 on failure
+int function TriggerCaptureCrosshairReleased(float holdDuration) Global Native
+
+; -----------------------------------------------------------------------------
+; --- Diary and Bio Generation Hotkey ---
+; -----------------------------------------------------------------------------
+
+; Simulates pressing the generate diary and bio hotkey
+; - Displays a menu to select target scope:
+;   - 0 = Player Only
+;   - 1 = Nearby Actors
+;   - 2 = Pinned Actors
+;   - 3 = Target in Crosshair
+; - Generates diary entries and dynamic bio updates for all matching actors
+; Returns 0 on success, 1 on failure
+int function TriggerGenerateDiaryBio() Global Native
+
+; -----------------------------------------------------------------------------
+; --- Interrupt Dialogue Hotkey ---
+; -----------------------------------------------------------------------------
+
+; Simulates pressing the interrupt dialogue hotkey
+; - Clears the audio queue and speech/TTS generation queue
+; - Clears streaming text buffers and dialogue queues for all actors
+; If abDeferToCurrentFinished is false (default): also interrupts currently playing audio immediately
+; If abDeferToCurrentFinished is true: allows currently playing audio to finish naturally;
+;   only queues are cleared so nothing follows after the current line ends
+; Useful for cutting off NPCs mid-sentence or clearing stuck dialogue
+; Returns 0 on success, 1 on failure
+int function TriggerInterruptDialogue(bool abDeferToCurrentFinished = false) Global Native
+
+; Simulates pressing the silent narration hotkey
+; - Shows "Enter silent narration text..." notification
+; - Opens text input dialog for silent event registration
+; - Registers a persistent_generic event that informs actors without triggering NPC responses
+; - Useful for establishing facts or outcomes without causing dialogue
+; Functions identically to pressing the configured silent narration key
+; Returns 0 on success
+int function TriggerSilentNarration() Global Native
+
+; -----------------------------------------------------------------------------
+; --- Events ---
+; -----------------------------------------------------------------------------
+
+
+; Package events
+; --------------
+;
+; SKSE ModEvents with the standard (String eventName, String strArg, Float numArg, Form sender) signature.
+; sender is the actor. They are sent whether or not SkyrimNet's outbound mod events setting is on.
+; One event per package row; never for a package SkyrimNet was not tracking.
+;
+; SkyrimNet_OnPackageAdded    strArg "<packageName>||<owner>", numArg 0.
+;     A row is newly created (RegisterPackage, RegisterPackageEx, ListPackage, SkyrimNet's own dialogue packages, also
+;     while the actor is held). Not sent when an existing row is registered again.
+;
+; SkyrimNet_OnPackageRemoved  strArg "<packageName>|<reason>|<owner>", numArg = reason code.
+;     A row leaves SkyrimNet's registry. owner is "" for a row without an owner.
+;     0 "api"       UnregisterPackage, UnregisterPackageEx, or SkyrimNet's C++ removing it by name
+;     1 "webui"     removed on the SkyrimNet Package Manager page
+;     2 "clearAll"  a mod's ClearAllPackages / ClearAllPackagesGlobally (one event per row)
+;     3 "death"     the actor died
+;     4 "delayed"   a ScheduleDelayedPackageRemoval fired
+;     5 "dialogue"  SkyrimNet ended a conversation (TalkToPlayer / TalkToNPC)
+;     6 "missing"   the package form no longer exists (its plugin was removed)
+;     7 "load"      a non-persistent package saved in the save was dropped when the save loaded
+;                   (delivered once the game runs again)
+;     8 "webuiAll"  Remove all on the SkyrimNet Package Manager page (one event per row): the player's
+;                   choice, where "clearAll" is another mod's
+;     9 "replaced"  a registration of the same name by another owner took the row over (owner = the
+;                   previous owner; the package may still run, under its new owner)
+;
+; SkyrimNet_OnPackagesHeld     strArg "<owner>", numArg = rows held (HoldPackages)
+; SkyrimNet_OnPackagesReleased strArg "<owner>|api" (ReleaseHeldPackages), "<owner>|webui" (the player
+;                              released every hold on the page) or "<owner>|death" (the actor died), one
+;                              event per holder; numArg = rows re-applied (0 while another holder remains,
+;                              and on death)
+;
+; Example:
+;
+; RegisterForModEvent("SkyrimNet_OnPackageRemoved", "OnSkyrimNetPackageRemoved")
+;
+; Event OnSkyrimNetPackageRemoved(String eventName, String strArg, Float numArg, Form sender)
+;     Actor akActor = sender as Actor
+;     Int firstBar = StringUtil.Find(strArg, "|")
+;     String packageName = StringUtil.Substring(strArg, 0, firstBar)
+;     If numArg as Int == 3 ; death
+;         ; ...
+;     EndIf
+; EndEvent
+;
+
+; -----------------------------------------------------------------------------
+; --- World Knowledge Management ---
+; -----------------------------------------------------------------------------
+
+; Create a world knowledge entry that NPCs can reference during dialogue.
+; World knowledge entries use Inja condition expressions to control which NPCs
+; receive the knowledge. Unlike per-actor memories, these are shared facts.
+;
+; - content: Knowledge text (required). Embedded for semantic search.
+; - conditionExpr: Inja condition controlling NPC eligibility. Examples:
+;     "" (empty = all NPCs)
+;     "is_in_faction(actorUUID, \"CompanionsFaction\")"
+;     "decnpc(actorUUID).race == \"Nord\""
+;     "is_in_npc_group(actorUUID, \"MyGroup\")"
+;     "get_quest_stage(\"MQ101\") >= 50"
+; - alwaysInject: If true, always included when condition passes (deterministic).
+;     If false, only surfaces via semantic search (probabilistic).
+; - importance: Score 0.0-1.0. Higher = more likely to appear in search results.
+; - displayName: Optional human-readable label. Pass "" to omit.
+;
+; Returns: Memory ID (> 0) on success, 0 on error.
+;
+; Example:
+;   int id = SkyrimNetApi.AddWorldKnowledge( \
+;       "The Companions honor the old ways of the warrior.", \
+;       "is_in_faction(actorUUID, \"CompanionsFaction\")", \
+;       true, 0.8, "Companions Lore")
+int function AddWorldKnowledge(String content, String conditionExpr, bool alwaysInject, float importance, String displayName) Global Native
+
+; -----------------------------------------------------------------------------
+; --- Voice Effect Management ---
+; -----------------------------------------------------------------------------
+
+; Set the active voice effect for an actor.
+; - akActor: Actor to update
+; - asEffectId: Effect recipe id (e.g. "werewolf"). Pass "" to clear.
+; Returns 0 on success, 1 on failure (unknown actor or effect id).
+int function SetVoiceEffect(Actor akActor, String asEffectId) Global Native
+
+; Clear the active voice effect for an actor (equivalent to SetVoiceEffect with "").
+; Returns 0 on success, 1 on failure.
+int function ClearVoiceEffect(Actor akActor) Global Native
+
+; Get the current voice effect id assigned to an actor.
+; Returns "" if none.
+String function GetVoiceEffect(Actor akActor) Global Native
+
+; UUID variants (for virtual entities or when you already have the UUID).
+int function SetVoiceEffectByUUID(String asEntityUUID, String asEffectId) Global Native
+int function ClearVoiceEffectByUUID(String asEntityUUID) Global Native
+String function GetVoiceEffectByUUID(String asEntityUUID) Global Native
+

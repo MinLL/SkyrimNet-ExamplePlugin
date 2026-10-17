@@ -1,0 +1,37 @@
+# A leaf action in the TavernManners category, calling ExB_Actions.BuyRound on quest ExB_Quest.
+#
+# The file name must equal `name` (BuyRound.yaml <-> BuyRound). Action names are shared by every
+# mod, so pick one specific enough not to collide.
+name: BuyRound
+description: >-
+  Pay for a round of drinks so {{ player.name }} gets one too. Use it to celebrate, to thank
+  someone, or to make a show of generosity.
+customCategory: TavernManners
+
+questEditorId: ExB_Quest
+scriptName: ExB_Actions
+executionFunctionName: BuyRound
+
+# One entry per Papyrus parameter, in order: Function BuyRound(Actor akSpeaker, int aiCost)
+parameterMapping:
+  - type: speaker          # the NPC performing the action
+  - type: static           # a fixed value the LLM never sees
+    value: 10
+
+# Checked before the LLM is offered the action. All rules marked required must pass.
+eligibilityRules:
+  - conditions:
+      - decoratorName: get_item_count
+        arguments: ["currentActor", "0x0000000F"]   # Gold001; hex strings are read as form ids
+        comparisonOperator: ">="
+        expectedValue: 10
+      - decoratorName: is_in_combat
+        arguments: ["currentActor"]
+        comparisonOperator: "=="
+        expectedValue: false
+    logicalOperator: AND
+    required: true
+
+# Recorded as an event when the action runs, so NPCs remember it. {{ actor_name }} is the speaker.
+eventString: "{{ actor_name }} bought a round of drinks."
+defaultPriority: 5

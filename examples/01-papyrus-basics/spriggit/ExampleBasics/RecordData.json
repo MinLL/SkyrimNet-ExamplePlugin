@@ -1,0 +1,21 @@
+{
+  "SpriggitSource": {
+    "PackageName": "Spriggit.Json.Skyrim",
+    "Version": "0.40.1"
+  },
+  "ModKey": "ExampleBasics.esp",
+  "GameRelease": "SkyrimSE",
+  "ModHeader": {
+    "Flags": [
+      "Small"
+    ],
+    "Author": "SkyrimNet Examples",
+    "MasterReferences": [
+      {
+        "Master": "Skyrim.esm",
+        "FileSize": 0
+      }
+    ],
+    "INTV": 1
+  }
+}

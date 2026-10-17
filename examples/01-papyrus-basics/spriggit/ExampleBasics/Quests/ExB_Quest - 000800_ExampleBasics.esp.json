@@ -1,0 +1,64 @@
+{
+  "FormKey": "000800:ExampleBasics.esp",
+  "EditorID": "ExB_Quest",
+  "VirtualMachineAdapter": {
+    "Scripts": [
+      {
+        "Name": "ExB_Actions",
+        "Properties": [
+          {
+            "MutagenObjectType": "ScriptObjectProperty",
+            "Name": "Ale",
+            "Object": "034C5E:Skyrim.esm"
+          },
+          {
+            "MutagenObjectType": "ScriptObjectProperty",
+            "Name": "Gold001",
+            "Object": "00000F:Skyrim.esm"
+          }
+        ]
+      }
+    ],
+    "FileName": "",
+    "Aliases": [
+      {
+        "Property": {
+          "Name": "",
+          "Object": "000800:ExampleBasics.esp",
+          "Alias": 0
+        },
+        "Scripts": [
+          {
+            "Name": "ExB_PlayerAlias",
+            "Properties": [
+              {
+                "MutagenObjectType": "ScriptObjectProperty",
+                "Name": "LocTypeInn",
+                "Object": "01CB87:Skyrim.esm"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "Name": {
+    "TargetLanguage": "English",
+    "Value": "Example Basics"
+  },
+  "Flags": [
+    "StartGameEnabled"
+  ],
+  "Priority": 50,
+  "NextAliasID": 1,
+  "Aliases": [
+    {
+      "Name": "PlayerAlias",
+      "Flags": [
+        "AllowReuseInQuest"
+      ],
+      "UniqueActor": "000007:Skyrim.esm",
+      "VoiceTypes": "Null"
+    }
+  ]
+}

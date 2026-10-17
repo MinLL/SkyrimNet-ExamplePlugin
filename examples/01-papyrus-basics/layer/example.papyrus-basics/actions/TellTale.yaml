@@ -1,0 +1,31 @@
+# A narrative action: the Papyrus function changes nothing, the recorded event is the point.
+name: TellTale
+description: >-
+  Launch into a story for whoever is listening: a legend, a rumor, or something that happened on
+  the road. Use it when there is an audience and time to spare.
+customCategory: TavernManners
+
+questEditorId: ExB_Quest
+scriptName: ExB_Actions
+executionFunctionName: TellTale
+
+# Function TellTale(Actor akSpeaker, string asTopic)
+parameterMapping:
+  - type: speaker
+  - type: dynamic
+    name: topic
+    description: "What the tale is about, in a few words."
+
+eligibilityRules:
+  - conditions:
+      - decoratorName: is_in_combat
+        arguments: ["currentActor"]
+        comparisonOperator: "=="
+        expectedValue: false
+    logicalOperator: AND
+    required: true
+
+eventString: "{{ actor_name }} told a tale about {{ topic }}."
+# Short-lived: the event shows in scene context for a while instead of being stored for good.
+isShortLived: true
+defaultPriority: 3

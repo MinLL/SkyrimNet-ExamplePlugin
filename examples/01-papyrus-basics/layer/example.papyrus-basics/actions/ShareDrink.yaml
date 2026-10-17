@@ -1,0 +1,32 @@
+# Speaker plus a target the LLM chooses.
+name: ShareDrink
+description: >-
+  Hand someone a bottle of ale. Use it to welcome a newcomer, make peace, or keep a friend's cup
+  full.
+customCategory: TavernManners
+
+questEditorId: ExB_Quest
+scriptName: ExB_Actions
+executionFunctionName: ShareDrink
+
+# Function ShareDrink(Actor akSpeaker, Actor akTarget)
+parameterMapping:
+  - type: speaker
+  - type: dynamic          # the LLM fills this in
+    name: target           # the key the LLM sees
+    description: "Who receives the ale: the player or a nearby NPC."
+    # An Actor parameter is resolved to a nearby actor by name. SkyrimNet adds the nearby names to
+    # this description so the LLM picks a real person (turn off with useNearbyActors: false).
+
+eligibilityRules:
+  - conditions:
+      - decoratorName: is_in_combat
+        arguments: ["currentActor"]
+        comparisonOperator: "=="
+        expectedValue: false
+    logicalOperator: AND
+    required: true
+
+# Dynamic parameters can be used in the event text by their name.
+eventString: "{{ actor_name }} handed {{ target }} a bottle of ale."
+defaultPriority: 5

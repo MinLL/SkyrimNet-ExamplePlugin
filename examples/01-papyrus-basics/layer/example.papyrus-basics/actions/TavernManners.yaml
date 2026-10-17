@@ -1,0 +1,13 @@
+# A category: an action with customCategory set and no executionFunctionName.
+#
+# The LLM first sees "TavernManners" next to the other top-level actions. Only when it picks it does
+# it see the actions inside: every action whose customCategory is "TavernManners". Grouping keeps
+# the top-level list short, which makes the LLM's choice faster and better.
+#
+# To nest a category inside another, give it customParentCategory: <the outer category's key>.
+name: TavernManners
+description: >-
+  Tavern hospitality: buying a round, sharing a drink, telling a tale. Choose this when the moment
+  calls for the friendly rituals of an inn or a drinking hall.
+customCategory: TavernManners
+defaultPriority: 5

@@ -1,0 +1,38 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "papyrus",
+      "displayName": "Papyrus examples (01, 02)",
+      "description": "No C++ compiler needed: CMake, Ninja and the tools from scripts/fetch-tools.ps1.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "BUILD_CPP_EXAMPLE": "OFF"
+      }
+    },
+    {
+      "name": "full",
+      "displayName": "All examples, including the C++ SKSE plugin (03)",
+      "description": "Needs Visual Studio 2022 (C++ workload) and VCPKG_ROOT pointing at a vcpkg checkout.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "BUILD_CPP_EXAMPLE": "ON",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/triplets",
+        "VCPKG_TARGET_TRIPLET": "skyrim-x64-windows-release",
+        "VCPKG_HOST_TRIPLET": "skyrim-x64-windows-release",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/build/vcpkg_installed"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "papyrus", "configurePreset": "papyrus" },
+    { "name": "full", "configurePreset": "full" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "example.papyrus-basics",
+  "type": "bundle",
+  "title": "Example: Papyrus Basics",
+  "tagline": "Tavern actions for NPCs and tavern events for SkyrimNet, written in Papyrus and YAML.",
+  "description": "The first SkyrimNet plugin example. NPCs can buy a round, share a drink or tell a tale, grouped under one Tavern Manners category. The player's visits to inns are reported to SkyrimNet as events.\n\n**Requires:** ExampleBasics.esp (shipped with this mod).",
+  "author": "example",
+  "tags": ["example"],
+  "nsfw": false,
+  "mods": [
+    { "name": "Example: Papyrus Basics", "file": "ExampleBasics.esp", "required": true }
+  ],
+  "version": "1.0.0",
+  "min_skyrimnet_version": "0.25.0"
+}

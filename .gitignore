@@ -1,0 +1,12 @@
+# Build output
+/build/
+/dist/
+/out/
+/external-tools/
+/vcpkg_installed/
+
+# IDEs
+/.vs/
+/.vscode/
+*.user
+CMakeUserPresets.json
