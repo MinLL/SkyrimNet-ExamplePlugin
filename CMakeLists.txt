@@ -19,9 +19,7 @@ include(Spriggit)
 include(Example)
 
 add_subdirectory(examples/01-papyrus-basics)
-if(EXISTS "${CMAKE_SOURCE_DIR}/examples/02-papyrus-context/CMakeLists.txt") # TEMP
-    add_subdirectory(examples/02-papyrus-context)
-endif()
+add_subdirectory(examples/02-papyrus-context)
 
 if(BUILD_CPP_EXAMPLE)
     enable_language(C CXX)

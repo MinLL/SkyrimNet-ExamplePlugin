@@ -1,0 +1,39 @@
+{% if render_mode == "full" or render_mode == "thoughts" or render_mode == "transform" %}
+{#
+  Example 02: what this NPC owes the player.
+
+  A character_bio submodule is rendered into every NPC's bio, in file-name order (0600
+  relationships, 0700 occupation...), so 0650 lands between them. Adding a file here extends the
+  bio without replacing any of SkyrimNet's own prompts.
+
+  actorUUID is the NPC whose bio this is. Everything below is read with decorators while the prompt
+  renders, so it is always current:
+    papyrus_util          values the mod's Papyrus scripts stored with StorageUtil
+    decnpc                the NPC's name and stats
+    get_relationship_rank the vanilla relationship rank, -4 (archnemesis) to 4 (lover)
+    get_recent_events     event history, filtered here to this mod's own event type
+
+  Render nothing when there is nothing to say: an empty heading costs tokens and invites the
+  LLM to invent content for it.
+#}
+{% if actorUUID != player.UUID %}
+{% set owed = papyrus_util("GetIntValue", actorUUID, "ExC_FavorsOwed", 0) %}
+{% if owed > 0 %}
+{% set npcName = decnpc(actorUUID).name %}
+{% set lastFavor = papyrus_util("GetStringValue", actorUUID, "ExC_LastFavor", "") %}
+{% set rank = get_relationship_rank(actorUUID, player.UUID) %}
+## Favors Owed
+- {{ npcName }} owes {{ player.name }} {{ owed }} favor{% if owed > 1 %}s{% endif %}{% if length(lastFavor) > 0 %}, most recently for {{ lastFavor }}{% endif %}.
+{% if rank >= 1 %}
+- {{ npcName }} counts {{ player.name }} as a friend and would be glad of a chance to repay.
+{% elif rank <= -1 %}
+- {{ npcName }} resents being in {{ player.name }}'s debt.
+{% else %}
+- {{ npcName }} knows the debt is real and means to settle it.
+{% endif %}
+{% for event in get_recent_events(30, actorUUID) %}{% if event.type == "example_favor" %}
+- Remembered: {{ format_event(event, "compact") }}
+{% endif %}{% endfor %}
+{% endif %}
+{% endif %}
+{% endif %}

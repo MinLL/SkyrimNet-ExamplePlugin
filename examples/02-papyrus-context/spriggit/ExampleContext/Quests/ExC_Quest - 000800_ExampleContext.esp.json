@@ -1,0 +1,52 @@
+{
+  "FormKey": "000800:ExampleContext.esp",
+  "EditorID": "ExC_Quest",
+  "VirtualMachineAdapter": {
+    "Scripts": [
+      {
+        "Name": "ExC_Actions"
+      }
+    ],
+    "FileName": "",
+    "Aliases": [
+      {
+        "Property": {
+          "Name": "",
+          "Object": "000800:ExampleContext.esp",
+          "Alias": 0
+        },
+        "Scripts": [
+          {
+            "Name": "ExC_PlayerAlias",
+            "Properties": [
+              {
+                "MutagenObjectType": "ScriptObjectProperty",
+                "Name": "CurrentFollowerFaction",
+                "Object": "05C84E:Skyrim.esm"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "Name": {
+    "TargetLanguage": "English",
+    "Value": "Example Context"
+  },
+  "Flags": [
+    "StartGameEnabled"
+  ],
+  "Priority": 50,
+  "NextAliasID": 1,
+  "Aliases": [
+    {
+      "Name": "PlayerAlias",
+      "Flags": [
+        "AllowReuseInQuest"
+      ],
+      "UniqueActor": "000007:Skyrim.esm",
+      "VoiceTypes": "Null"
+    }
+  ]
+}

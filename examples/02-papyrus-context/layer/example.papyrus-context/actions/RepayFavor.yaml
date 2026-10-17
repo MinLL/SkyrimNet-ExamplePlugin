@@ -1,0 +1,31 @@
+# Offered only to NPCs who owe the player a favor. The eligibility rule reads the same StorageUtil
+# value the prompt does, through the papyrus_util decorator: no Papyrus runs to decide eligibility.
+name: RepayFavor
+description: >-
+  Repay a favor you owe {{ player.name }}: a tip, a discount, a secret, a helping hand. Use it when
+  {{ player.name }} asks for help or when the chance to even the debt comes up naturally.
+
+questEditorId: ExC_Quest
+scriptName: ExC_Actions
+executionFunctionName: RepayFavor
+
+# Function RepayFavor(Actor akSpeaker, string asHow)
+parameterMapping:
+  - type: speaker
+  - type: dynamic
+    name: how
+    description: "How you repay the favor, in a few words."
+
+eligibilityRules:
+  - conditions:
+      # papyrus_util(function, form, key, default). "currentActor" becomes the NPC's UUID, which
+      # papyrus_util resolves to the actor StorageUtil stored the value on.
+      - decoratorName: papyrus_util
+        arguments: ["GetIntValue", "currentActor", "ExC_FavorsOwed", 0]
+        comparisonOperator: ">"
+        expectedValue: 0
+    logicalOperator: AND
+    required: true
+
+eventString: "{{ actor_name }} repaid a favor owed to {{ player.name }}: {{ how }}."
+defaultPriority: 4

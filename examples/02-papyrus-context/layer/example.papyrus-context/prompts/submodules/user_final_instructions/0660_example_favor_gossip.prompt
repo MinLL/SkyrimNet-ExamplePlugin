@@ -1,0 +1,13 @@
+{% if render_mode == "full" %}
+{#
+  Example 02: gossip about the player's recent good deeds.
+
+  user_final_instructions submodules are added at the end of the prompt, the place for short,
+  situational guidance. This one reads a global StorageUtil list: "none" as the form means
+  StorageUtil's global scope (None in Papyrus).
+#}
+{% set deeds = papyrus_util("GetStringList", "none", "ExC_RecentDeeds") %}
+{% if length(deeds) > 0 %}
+- Word has it {{ player.name }} has been generous lately ({% for deed in deeds %}{{ deed }}{% if not loop.is_last %}; {% endif %}{% endfor %}). Mention it only if it fits the conversation.
+{% endif %}
+{% endif %}

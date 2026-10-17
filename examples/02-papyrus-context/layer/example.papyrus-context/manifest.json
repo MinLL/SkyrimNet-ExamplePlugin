@@ -1,0 +1,15 @@
+{
+  "id": "example.papyrus-context",
+  "type": "bundle",
+  "title": "Example: Papyrus Context",
+  "tagline": "NPCs remember the favors you did them, through PapyrusUtil data read straight into their prompts.",
+  "description": "The second SkyrimNet plugin example. Gifts to NPCs are kept in a favor ledger with PapyrusUtil's StorageUtil, sent to SkyrimNet as a custom event type, and read into each NPC's prompt with the papyrus_util decorator. An NPC who owes you can repay the favor.\n\n**Requires:** ExampleContext.esp (shipped with this mod) and PapyrusUtil.",
+  "author": "example",
+  "tags": ["example"],
+  "nsfw": false,
+  "mods": [
+    { "name": "Example: Papyrus Context", "file": "ExampleContext.esp", "required": true }
+  ],
+  "version": "1.0.0",
+  "min_skyrimnet_version": "0.25.0"
+}
