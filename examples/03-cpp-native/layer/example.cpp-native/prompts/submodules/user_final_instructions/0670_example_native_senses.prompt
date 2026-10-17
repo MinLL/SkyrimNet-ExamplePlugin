@@ -1,0 +1,18 @@
+{% if render_mode == "full" %}
+{#
+  Example 03: data from ExampleNative.dll's C++ decorators.
+
+  Why user_final_instructions and not character_bio: SkyrimNet joins all character_bio files into
+  one template, so if the DLL failed to load, an unknown function here would break every NPC's
+  bio. Files in this folder render one by one, and a failure costs only this file.
+
+  C++ decorators return strings. to_number turns one back into a number for comparisons.
+#}
+{% if npc.UUID != player.UUID %}
+{% set purse = native_senses_purse(npc.UUID) %}
+{% set lines = to_number(native_senses_lines_spoken(npc.UUID)) %}
+{% if length(purse) > 0 %}
+- {{ decnpc(npc.UUID).name }}'s purse is {{ purse }}{% if lines >= 20 %}, and they have been talkative today{% endif %}.
+{% endif %}
+{% endif %}
+{% endif %}

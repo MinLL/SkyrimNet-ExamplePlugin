@@ -1,0 +1,12 @@
+{
+  "id": "example.cpp-native",
+  "type": "bundle",
+  "title": "Example: C++ Native",
+  "tagline": "An SKSE plugin that gives SkyrimNet C++ decorators, actions and event callbacks.",
+  "description": "The third SkyrimNet plugin example. ExampleNative.dll registers two decorators, a category of actions and a dialogue event callback through SkyrimNet's C++ API; this layer uses its decorators in a prompt.\n\n**Requires:** ExampleNative.dll (shipped with this mod) and Address Library for SKSE Plugins.",
+  "author": "example",
+  "tags": ["example"],
+  "nsfw": false,
+  "version": "1.0.0",
+  "min_skyrimnet_version": "0.25.0"
+}
