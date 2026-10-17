@@ -1,6 +1,27 @@
 # SkyrimNet Plugin Examples: Design
 
-Status: draft for review, 2026-10-17. Local only; goes public later.
+Status: implemented 2026-10-17 (local only; goes public later). The README and `docs/` describe
+the repo as built; this file keeps the reasoning. Where the build departed from the draft below:
+
+- **Build entry point:** a root `build.ps1` (enters the VS dev shell, runs the preset) replaced
+  `scripts/package.ps1`; staging and zipping happen in CMake (`cmake/Example.cmake`,
+  `skyrimnet_example()`), whose staging target is `<Name>_mod`. Both presets use Ninja.
+- **Docs:** `getting-started.md` and `choosing-an-integration-path.md` folded into the README and
+  `best-practices.md`.
+- **Spriggit:** the serializer is pinned at `Spriggit.Json.Skyrim` 0.40.1 (the 0.41.0 NuGet package
+  does not install); the CLI stays 0.41.0. The reverse direction is `scripts/spriggit-sync.ps1`.
+- **Example 01:** event text uses type `"custom"`, the only type that accepts plain text.
+- **Example 02:** one top-level action (`RepayFavor`), no category (01 already teaches categories).
+  Favors come from gifts (`OnItemRemoved` into an NPC, not bartering, not followers).
+- **Example 03:** decorators are `native_senses_lines_spoken` (plugin state, from the dialogue
+  callback) and `native_senses_purse` (game data). Actions are `TossCoins` and
+  `ReminisceWithPlayer`. Its prompt is in `user_final_instructions`, not `character_bio`: bio files
+  are composed into one template, so an unknown decorator from a DLL that failed to load would break
+  every NPC's bio.
+- **Manifest `author`** must equal the id's author segment (`content-validate` enforces it).
+- **Found in Core while building:** `PublicAPI.h` documents `categoryStr` as "Combat"/"Social"
+  (the code accepts only `CPP`, `CPP_NESTED_ACTION`, `CPP_SUB_CATEGORY`), says consumers need `/MD`
+  (SkyrimNet builds with `/MT`), and its decorator example uses YAML keys the parser does not read.
 
 ## Purpose
 
