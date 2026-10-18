@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 This repo holds example SkyrimNet plugins that mod authors copy to build their own. Code here is
 read as the reference for "how to do it right", so it must be clean, commented for a first-time
@@ -11,6 +11,9 @@ reader, and free of shortcuts.
 | NPC actions, events, a version check, in Papyrus | `examples/01-papyrus-basics` |
 | Their mod's data in NPC prompts, a custom event type | `examples/02-papyrus-context` |
 | C++ decorators or actions, memory queries | `examples/03-cpp-native` |
+
+Workflows in `.agents/skills/`: `new-plugin` (scaffold and rename a plugin from an example),
+`migrate-beta25` (port a Beta 24 loose-file mod to a Beta 25 layer).
 
 Rules with reasons: `docs/best-practices.md`. Content formats (actions, triggers, prompts, roots):
 `docs/modding/`. The API itself: `sdk/cpp/PublicAPI.h`, `sdk/papyrus/SkyrimNetApi.psc`.
@@ -25,7 +28,7 @@ Rules with reasons: `docs/best-practices.md`. Content formats (actions, triggers
 external-tools/skyrimnet/content-validate.exe <layer dir>   # validate a layer
 ```
 
-From the Bash tool, run these through `powershell.exe -ExecutionPolicy Bypass -File <script>`.
+From a bash shell, run these through `powershell.exe -ExecutionPolicy Bypass -File <script>`.
 
 ## Hard rules
 
@@ -34,8 +37,9 @@ From the Bash tool, run these through `powershell.exe -ExecutionPolicy Bypass -F
 - Check SkyrimNet before calling it: `SKSE.GetPluginVersion` + `GetBuildVersion` in Papyrus, resolved
   pointers in C++. Keep the manifest's `min_skyrimnet_version` in step.
 - Nothing slow on the game thread. C++ action `execute` runs there; queries and I/O go to a worker.
-- In C++, only `SkyrimNetBridge.cpp` includes `PublicAPI.h`, so every version check lives in one place.
-  (Copies of the header from before SkyrimNet 0.28 define globals and break a second include.)
+- In C++, keep `PublicAPI.h` in `SkyrimNetBridge.cpp` so every version check lives in one place
+  (and copies of the header from before SkyrimNet 0.28, which defined non-inline globals, still
+  link).
 - One prefix for everything a mod owns: scripts, editor ids, StorageUtil keys, decorators, event types.
   Action names are LLM-facing plain words.
 - Content goes in the external layer. Folder name = manifest `id`; `author` = the id's author segment;

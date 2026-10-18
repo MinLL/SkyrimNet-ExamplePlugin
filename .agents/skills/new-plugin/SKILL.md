@@ -1,5 +1,6 @@
 ---
-description: "Start a new SkyrimNet plugin from one of the examples"
+name: new-plugin
+description: Start a new SkyrimNet plugin in examples/ from one of the reference examples, renaming prefixes, IDs, CMake targets, and Spriggit records.
 ---
 
 # New plugin
@@ -12,7 +13,7 @@ means two mods fighting over one script name.
 
 Ask for anything not already given:
 
-- **What the mod should do.** Pick the starting example from the table in `CLAUDE.md` and say why.
+- **What the mod should do.** Pick the starting example from the table in `AGENTS.md` and say why.
 - **Mod name** in PascalCase (`TavernTales`). Used for the `.esp`, the quest, the folder in `dist/`.
 - **Prefix**, 2-4 letters plus `_` (`TT_`). Suggest one from the name.
 - **Layer id**, `<author>.<slug>`: lowercase `[a-z0-9_-]`, author not `skyrimnet` (`bob.tavern-tales`).
@@ -41,3 +42,4 @@ Add `add_subdirectory(examples/<new>)` to the root `CMakeLists.txt`.
 1. `./build.ps1` (or `-Preset full` for a C++ plugin). Fix every error and warning.
 2. `external-tools/skyrimnet/content-validate.exe examples/<new>/layer/<id>`: 0 errors.
 3. Show the author the new folder tree and what to edit first.
+

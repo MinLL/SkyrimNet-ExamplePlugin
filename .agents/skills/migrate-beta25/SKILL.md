@@ -1,5 +1,6 @@
 ---
-description: "Port a Beta 24 loose-file SkyrimNet mod to the Beta 25 content-library layout"
+name: migrate-beta25
+description: Port a Beta 24 loose-file SkyrimNet mod to the Beta 25 content-library layout using content-convert.
 ---
 
 # Migrate to Beta 25
@@ -108,3 +109,4 @@ Plugin Hub is the preferred distribution path: users install and update from the
 compatibility warnings before install rather than after, and the pack is discoverable. The
 converted layer is already a valid hub bundle — the same `manifest.json` and the same directory
 shape — so publishing later costs the author nothing they have not already done.
+
