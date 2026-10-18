@@ -76,13 +76,11 @@ skyrimnet-plugin-examples/
 │   ├── building.md                       Tools, presets, Spriggit <-> ESP round trip
 │   ├── sdk-sync.md                       The CI contract with Core
 │   └── modding/                          Moved from skyrimnet-gameplugin/docs/modding
-├── CLAUDE.md                       Agent guide (see "Agent setup")
+├── AGENTS.md                       Agent guide (see "Agent setup")
 ├── .mcp.json                       SkyrimNet's in-game MCP server, optional
-├── .claude/
-│   ├── settings.json               Allows the read-only and build commands
-│   └── commands/
-│       ├── new-plugin.md           Start a plugin from one of the examples
-│       └── migrate-beta25.md       Moved from skyrimnet-gameplugin
+├── .agents/skills/
+│   ├── new-plugin/SKILL.md         Start a plugin from one of the examples
+│   └── migrate-beta25/SKILL.md     Moved from skyrimnet-gameplugin
 ├── .github/workflows/build.yml           Builds all three against sdk/; packages dist zips
 └── examples/
     ├── 01-papyrus-basics/
@@ -224,12 +222,12 @@ Demonstrates:
 Known API limitation, called out in the README: C++ decorators take one `RE::Actor*` and return a
 string. Multi-argument decorators exist only as built-ins today.
 
-## Agent setup (`.claude`)
+## Agent setup (`AGENTS.md`, `.agents/skills/`)
 
-Small on purpose. Rules and patterns live in the docs, and the agent files point to them so
-there is one copy. No agents, hooks or skills.
+Small and platform-neutral. Rules and patterns live in the docs, and the agent files point to them
+so there is one copy.
 
-**`CLAUDE.md`** (under ~120 lines):
+**`AGENTS.md`** (under ~120 lines):
 - What the repo is, and which example to start from for which need (a three-row table).
 - Build, package and validate commands.
 - Hard rules, one line each with the reason, linking to `docs/best-practices.md`:
@@ -250,14 +248,11 @@ there is one copy. No agents, hooks or skills.
 **`.mcp.json`**: `skyrimnet` → `http://localhost:8889/sse`. It only connects while the game is
 running with SkyrimNet loaded. It is the useful path for `get_decorators` (what exists in this
 build), `validate_custom_action`, `validate_prompt` and `render_template` against a real NPC.
-`CLAUDE.md` says to work without it when the game is off.
+`AGENTS.md` says to work without it when the game is off.
 
-**`.claude/commands/new-plugin.md`**: asks for the plugin name, author id and starting example;
+**`.agents/skills/new-plugin/SKILL.md`**: asks for the plugin name, author id and starting example;
 copies the example; renames the prefix, manifest id, ESP, quest and script names everywhere; then
 builds it. This is the step authors get wrong most often by hand.
-
-**`.claude/settings.json`**: allow-list only: `cmake --build`, `scripts/*.ps1`,
-`content-validate.exe`, `git status/diff/log`. Nothing that writes outside the repo.
 
 ## SDK sync: Core CI owns `sdk/`
 
@@ -270,7 +265,7 @@ On every Core release (`selfhosted-build.yml`, dispatch with a tag):
 3. On merge it tags `vX.Y.Z`. The release workflow uploads `content-convert.exe` and
    `content-validate.exe` to that tag's GitHub Release.
 
-`docs/`, `.claude/` and the examples are **not** touched by sync; they are hand-maintained here.
+`docs/`, `AGENTS.md`, `.agents/` and the examples are **not** touched by sync; they are hand-maintained here.
 
 Needs before it can run: the repo on GitHub (private is fine) and a token or GitHub App with
 contents and pull-request write access. Until then `sync_sdk.py --dest D:\repos\skyrimnet-plugin-examples`
@@ -292,7 +287,7 @@ runs locally.
 
 ## Build order
 
-1. Repo skeleton, tools fetch, CMake modules, docs moved in, `.claude` setup.
+1. Repo skeleton, tools fetch, CMake modules, docs moved in, `AGENTS.md` setup.
 2. Example 01 end to end (build, package, install, verify in game).
 3. Example 02.
 4. Example 03, plus the Core `PublicAPI.h` PR.

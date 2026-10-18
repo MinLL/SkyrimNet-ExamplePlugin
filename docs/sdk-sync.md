@@ -11,8 +11,8 @@
 | `sdk/papyrus/SkyrimNetApi.psc` | GamePlugin `Source/Scripts/` |
 | Release assets: `content-convert.exe`, `content-validate.exe` | Core's build |
 
-Nothing else in this repo is touched by the sync. `docs/`, `.claude/` and `examples/` are edited
-here by hand.
+Nothing else in this repo is touched by the sync. `docs/`, `AGENTS.md`, `.agents/` and `examples/`
+are edited here by hand.
 
 ## How it runs
 
