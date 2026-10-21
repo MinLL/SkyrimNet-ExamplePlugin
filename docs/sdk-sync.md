@@ -24,6 +24,10 @@ On a SkyrimNet release, Core's `selfhosted-build.yml`:
 3. After the merge, tags `v<version>` and attaches the tools to that tag's GitHub Release, where
    `scripts/fetch-tools.ps1` finds them.
 
+`tools.json` has no `skyrimnet-tools` url yet (see its `_comment`; one gets added once this repo is
+public and a release has the tools), so `fetch-tools.ps1` skips `content-convert.exe` and `content-validate.exe`: copy them from a local
+SkyrimNet-Core build into `external-tools/skyrimnet/`.
+
 ## Running it by hand
 
 ```powershell

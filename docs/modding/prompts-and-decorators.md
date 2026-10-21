@@ -28,6 +28,11 @@ There are several native decorators supplied, an overview of which can be found 
 
 ## Creating Custom Decorators
 
+> [!NOTE]
+> `SkyrimNetApi.RegisterDecorator` is deprecated. It still works, and mods that already use it keep working, but a Papyrus decorator is a VM round trip on every prompt render.
+> For a new Papyrus mod, store your data with StorageUtil and read it in the prompt with `papyrus_util(...)` (see `examples/02-papyrus-context`). For a DLL, use `PublicRegisterDecorator` (see `examples/03-cpp-native`).
+> See [Deprecated: do not use](../best-practices.md#deprecated-do-not-use) for the full list.
+
 You can register your own custom decorators using papyrus, to get your mods data into the prompts.
 
 In your papyrus code, register a decorator with SkyrimNet
