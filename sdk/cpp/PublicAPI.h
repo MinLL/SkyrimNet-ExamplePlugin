@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025-2026 Fateless.Ai. SkyrimNet's plugin API headers are MIT licensed: include them
+// in any mod, open or closed source. SkyrimNet itself is not open source.
+
 #pragma once
 #include <string>
 #include <windows.h>
@@ -42,7 +46,7 @@
  * is the safe choice.
  *
  * The function pointers below are inline variables, so this header can be included from any number of
- * .cpp files. Copies from releases before SkyrimNet 0.28 are not: include those from one .cpp only.
+ * .cpp files. Copies from SkyrimNet 0.29 and earlier are not: include those from one .cpp only.
  *
  * Thread safety: All data query functions (v3+) are thread-safe and return
  * empty results gracefully if called before the database is ready. Action
@@ -55,7 +59,7 @@ extern "C" {
 // =============================================================================
 
 /**
- * Returns the runtime API version (currently 12).
+ * Returns the runtime API version (currently 14).
  * Version history: 2 = action registration, 3 = data queries + UUID + config,
  *                  4 = diary queries,
  *                  5 = decorator registration + event callbacks + memory creation,
@@ -66,7 +70,9 @@ extern "C" {
  *                 10 = filtered memory queries,
  *                 11 = timeline state, filtered diary queries, diary add/edit/delete,
  *                      memory edit/delete, actor search, event registration with an audience,
- *                 12 = send custom decision request to the decision model.
+ *                 12 = send custom decision request to the decision model,
+ *                 13 = named places (add, remove, sync, list, place at),
+ *                 14 = dynamic profile update request with optional instructions and updatable block overrides.
  */
 inline int (*PublicGetVersion)() = nullptr;
 
@@ -892,6 +898,47 @@ inline bool (*PublicSendCustomDecisionToLLM)(const char* templateName, const cha
                                       std::function<void(const char* answer, const char* resultJson, int success)> callback) = nullptr;
 
 // =============================================================================
+// Named places (v13)
+// =============================================================================
+//
+// Named spots inside a location ("the kitchen") that go in an actor's location string, after its first part, while
+// they stand in one. A place is a position in a space (an interior cell's FormID, or the worldspace outdoors) and matches
+// within its radius (<= 0 = the default, 350 indoors and 1500 outdoors, clamped to 50-5000) and 200 units up
+// or down; the smallest containing place wins. The player's places and the ones plugins ship are `places/` records
+// in the content library. Yours live in memory only: send them after every load (PublicSyncPlaces), since a load or
+// a new game forgets them. Every place you send belongs to your source, your mod's id (required, never "player" or
+// "library"), and is keyed by your own key, unique within it. All mods together hold at most 256.
+
+/**
+ * Add or update one of your places by your own key: the place of (source, key) is updated in place.
+ * @return false (no source, a reserved one, empty key or name, space 0, 256 places held).
+ */
+inline bool (*PublicAddPlace)(const char* source, const char* key, const char* name, uint32_t spaceFormId,
+                              float x, float y, float z, float radius, uint32_t ownerLocationFormId) = nullptr;
+
+/** Remove one of your places by its key. False when you have none under it. */
+inline bool (*PublicRemovePlace)(const char* source, const char* key) = nullptr;
+
+/**
+ * Make your places exactly this list: a JSON array of
+ * {"key","name","space","x","y","z","radius","ownerLocation"} (key, name and space required). Each entry
+ * is upserted by its key and every other place of your source removed, so calling it after every change
+ * and after every load keeps SkyrimNet in step with your own data.
+ * @return the places kept, or -1 (no source, a reserved one, text that is not an array; nothing changes).
+ */
+inline int (*PublicSyncPlaces)(const char* source, const char* placesJson) = nullptr;
+
+/**
+ * The places of a source ("" = every source, "library" = the content library's): a JSON array of
+ * {id, key, name, source, space, ownerLocation, x, y, z, radius}. `id` names a library place (its record's file stem),
+ * `key` a mod's.
+ */
+inline std::string (*PublicListPlaces)(const char* sourceFilter) = nullptr;
+
+/** The place an actor stands in as {"id","key","name","source"}, or "" for none (or the setting off). */
+inline std::string (*PublicGetPlaceAt)(uint32_t actorFormId) = nullptr;
+
+// =============================================================================
 // Package manager probe (independent of PublicGetVersion)
 // =============================================================================
 
@@ -903,6 +950,59 @@ inline bool (*PublicSendCustomDecisionToLLM)(const char* templateName, const cha
  * There are no C++ package functions; a DLL uses this to know the Papyrus contract is there.
  */
 inline uint32_t (*PublicGetPackageApiVersion)() = nullptr;
+
+// =============================================================================
+// Dynamic Character Profile Updates (v14+)
+// =============================================================================
+
+/**
+ * Request an asynchronous dynamic character profile (bio) update for an actor.
+ *
+ * Queues a background update using SkyrimNet's `dynamic_bio_update` pipeline on
+ * the internal worker thread pool and returns immediately without blocking the
+ * game thread. The updated dynamic bio is persisted to the active playthrough's
+ * content layer (`prompts/characters/dynamic/<name>.dynamic.prompt`).
+ *
+ * @param formId                 Actor's Skyrim FormID (non-zero; must resolve to a
+ *                               valid actor; if no bio file exists yet, an initial
+ *                               profile is generated automatically).
+ * @param additionalInstructions Optional caller-provided guidance for the LLM
+ *                               describing what changed or what should be updated
+ *                               (nullptr or "" for standard event/memory-driven update).
+ * @param updatableBlocksCSV     Optional comma-separated list of bio block names
+ *                               allowed to be modified during this update (case-insensitive).
+ *                               Valid block names: "summary", "interject_summary",
+ *                               "background", "personality", "appearance",
+ *                               "aspirations", "relationships", "occupation",
+ *                               "skills", "speech_style", or "all" ("*") to allow
+ *                               updating every block (nullptr or "" to use the
+ *                               user's configured `updatable_blocks` default).
+ * Only one profile update per actor may be in flight at a time; concurrent calls
+ * for the same actor while an update is already running return false.
+ *
+ * @return true if the actor and dynamic bio system were validated and the update
+ *         task was queued on the background thread pool; false if @p formId could
+ *         not be resolved, the dynamic bio manager is not initialized, or an
+ *         update for this actor is already in flight.
+ *
+ * @code
+ *   if (SkyrimNet::PublicAPI::PublicRequestProfileUpdate) {
+ *       // Update using default configured updatable blocks with extra guidance:
+ *       SkyrimNet::PublicAPI::PublicRequestProfileUpdate(
+ *           actorFormId,
+ *           "Lydia was promoted to Steward of Dragonsreach and now distrusts Ulfric.",
+ *           nullptr);
+ *
+ *       // Restrict this update to specific blocks:
+ *       SkyrimNet::PublicAPI::PublicRequestProfileUpdate(
+ *           actorFormId,
+ *           "Reflect her new scar across the left cheek from the Frost Troll ambush.",
+ *           "appearance");
+ *   }
+ * @endcode
+ */
+inline bool (*PublicRequestProfileUpdate)(uint32_t formId, const char* additionalInstructions,
+                                          const char* updatableBlocksCSV) = nullptr;
 
 // =============================================================================
 // Initialization
@@ -1073,6 +1173,26 @@ inline bool FindFunctions() {
                 PublicSendCustomDecisionToLLM = reinterpret_cast<bool(*)(const char*, const char*, int,
                     std::function<void(const char*, const char*, int)>)>(
                     GetProcAddress(hDLL, "PublicSendCustomDecisionToLLM"));
+            }
+
+            // v13+ functions
+            if (version >= 13) {
+                PublicAddPlace = reinterpret_cast<bool(*)(const char*, const char*, const char*, uint32_t,
+                    float, float, float, float, uint32_t)>(GetProcAddress(hDLL, "PublicAddPlace"));
+                PublicRemovePlace = reinterpret_cast<bool(*)(const char*, const char*)>(
+                    GetProcAddress(hDLL, "PublicRemovePlace"));
+                PublicSyncPlaces = reinterpret_cast<int(*)(const char*, const char*)>(
+                    GetProcAddress(hDLL, "PublicSyncPlaces"));
+                PublicListPlaces = reinterpret_cast<std::string(*)(const char*)>(
+                    GetProcAddress(hDLL, "PublicListPlaces"));
+                PublicGetPlaceAt = reinterpret_cast<std::string(*)(uint32_t)>(
+                    GetProcAddress(hDLL, "PublicGetPlaceAt"));
+            }
+
+            // v14+ functions
+            if (version >= 14) {
+                PublicRequestProfileUpdate = reinterpret_cast<bool(*)(uint32_t, const char*, const char*)>(
+                    GetProcAddress(hDLL, "PublicRequestProfileUpdate"));
             }
         }
         return true;
